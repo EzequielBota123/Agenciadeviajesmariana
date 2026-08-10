@@ -1,0 +1,26 @@
+{
+  "name": "tarifa-viva",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monitor de tarifas en vivo para agencias de viajes: publicá paquetes, recibí consultas que cambian, y dejá que un agente verifique la tarifa real del día contra las aerolíneas.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:setup": "node scripts/setup-db.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.116.0",
+    "@neondatabase/serverless": "^1.0.2",
+    "next": "^16.3.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "typescript": "^5.8.3"
+  }
+}
