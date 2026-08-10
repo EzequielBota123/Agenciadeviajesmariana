@@ -48,7 +48,7 @@ console.log(`Aplicando ${statements.length} statements...`);
 for (const statement of statements) {
   const label = statement.replace(/\s+/g, ' ').slice(0, 70);
   try {
-    await sql(statement);
+    await sql.query(statement);
     console.log(`  ok  ${label}`);
   } catch (err) {
     console.error(`  ERR ${label}`);
