@@ -99,6 +99,27 @@ convierte a un USD aproximado con la cotización oficial de
 [DolarAPI](https://dolarapi.com), y la app muestra las dos cifras siempre que
 la moneda nativa no sea dólares (`ARS 215.054 · ≈ USD 141,48`).
 
+### Comparación entre aerolíneas
+
+El worker también sabe consultar **JetSMART** (`worker/jetsmart.mjs`) — a
+diferencia de Aerolíneas, ahí no hace falta navegador: el sitio expone en el
+HTML de su home la URL de su motor de reservas (patrón Navitaire,
+`origin.jsrtff.it.jetsm.art`), y ese endpoint responde JSON abierto con el
+precio ya convertido a ARS y USD, sin token ni cookies.
+
+`POST /api/fares/compare` en la app le pega a `POST /compare` en el worker,
+que corre Aerolíneas y JetSMART **en paralelo** y devuelve ambos resultados
+(o el error del que falló) para poder mostrar una comparación de precios
+lado a lado. Lo usa el botón "Comparar entre aerolíneas" del simulador en la
+home.
+
+**Se evaluaron también LATAM, Flybondi y Despegar y no se pudieron sumar:**
+LATAM devuelve 403 al toque (bloqueo tipo Akamai); Flybondi mete el buscador
+real detrás de un Cloudflare Managed Challenge que nunca resuelve en headless;
+Despegar tiene DataDome + Cloudflare encima y devuelve 403 con página en
+blanco incluso con un browser real. En los tres casos se paró ahí — nada de
+proxies, rotación de IP o resolución de CAPTCHA para forzarlo.
+
 **Sobre scrapear la web de la aerolínea directamente:** lo pediste así y se puede hacer, pero no
 desde acá, por tres razones concretas. Va contra los términos de uso de las aerolíneas; las
 funciones serverless de Vercel no sostienen un navegador headless con los tiempos y la memoria que

@@ -12,24 +12,10 @@
 // simulador automáticamente y lo marca como tal — nunca se cae la consulta.
 
 import { chromium } from 'playwright';
+import { endOfArDay, fetchUsdRate } from './util.mjs';
 
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
-
-/** Fin del día de hoy en hora argentina (UTC-3 fijo, sin horario de verano). */
-function endOfArDay(now = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Argentina/Buenos_Aires',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(now);
-  const y = Number(parts.find((p) => p.type === 'year').value);
-  const m = Number(parts.find((p) => p.type === 'month').value);
-  const d = Number(parts.find((p) => p.type === 'day').value);
-  // 23:59:59.999 en Buenos Aires == 02:59:59.999 UTC del día siguiente (UTC-3 fijo).
-  return new Date(Date.UTC(y, m - 1, d + 1, 2, 59, 59, 999));
-}
 
 let browserPromise = null;
 
@@ -134,23 +120,6 @@ async function searchOneWay(page, { origin, destination, date, cabinClass }) {
     departure: firstSegment?.departure ?? null,
     raw: { offerId: cheapest.offerId, brand: cheapest.brand, flightNumber: firstSegment?.flightNumber },
   };
-}
-
-/**
- * Cotización ARS→USD vía DolarAPI. Si falla, no tira la búsqueda: devuelve
- * null y el caller decide qué hacer (acá, dejamos el total en ARS nomás y el
- * caller de la app terminará usando su propia conversión de respaldo).
- */
-async function fetchUsdRate() {
-  try {
-    const res = await fetch('https://dolarapi.com/v1/dolares/oficial', { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return null;
-    const json = await res.json();
-    const rate = Number(json.venta);
-    return Number.isFinite(rate) && rate > 0 ? rate : null;
-  } catch {
-    return null;
-  }
 }
 
 /**

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { formatArs, formatUsd, secondaryPerPaxLabel, secondaryTotalLabel } from '@/lib/money';
 import type { FareSnapshot } from '@/lib/types';
+import type { FareResult } from '@/lib/fares/types';
 
 interface CheckResponse {
   snapshot: FareSnapshot;
@@ -13,6 +14,16 @@ interface CheckResponse {
   fallbackReason: string | null;
   disclaimer: string;
 }
+
+interface CompareResponse {
+  results: FareResult[];
+  errors: Array<{ carrier: string; message: string }>;
+}
+
+const CARRIER_LABEL: Record<string, string> = {
+  aerolineas: 'Aerolíneas Argentinas',
+  jetsmart: 'JetSMART',
+};
 
 const ROUTES = [
   { value: 'EZE|CUN', label: 'EZE → Cancún' },
@@ -38,11 +49,17 @@ export function FareChecker() {
   const [result, setResult] = useState<CheckResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [comparing, setComparing] = useState(false);
+  const [compareResult, setCompareResult] = useState<CompareResponse | null>(null);
+  const [compareError, setCompareError] = useState<string | null>(null);
+
   async function check() {
     const [origin, destination] = route.split('|');
     setLoading(true);
     setError(null);
     setResult(null);
+    setCompareResult(null);
+    setCompareError(null);
     try {
       const res = await fetch('/api/fares/check', {
         method: 'POST',
@@ -56,6 +73,27 @@ export function FareChecker() {
       setError(err instanceof Error ? err.message : 'Error inesperado.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function compare() {
+    const [origin, destination] = route.split('|');
+    setComparing(true);
+    setCompareError(null);
+    setCompareResult(null);
+    try {
+      const res = await fetch('/api/fares/compare', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ origin, destination, departDate: date, pax }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'No se pudo comparar entre aerolíneas.');
+      setCompareResult(json as CompareResponse);
+    } catch (err) {
+      setCompareError(err instanceof Error ? err.message : 'Error inesperado.');
+    } finally {
+      setComparing(false);
     }
   }
 
@@ -112,6 +150,14 @@ export function FareChecker() {
 
           <button className="btn block" onClick={check} disabled={loading}>
             {loading ? 'Consultando disponibilidad…' : 'Consultar tarifa de hoy'}
+          </button>
+          <button
+            className="btn ghost block"
+            style={{ marginTop: 10 }}
+            onClick={compare}
+            disabled={comparing}
+          >
+            {comparing ? 'Comparando aerolíneas…' : 'Comparar entre aerolíneas'}
           </button>
         </div>
 
@@ -192,6 +238,89 @@ export function FareChecker() {
           )}
         </div>
       </div>
+
+      {comparing && (
+        <p className="loading-dots" style={{ marginTop: 24, display: 'block' }}>
+          consultando todas las aerolíneas en paralelo
+        </p>
+      )}
+
+      {!comparing && compareError && (
+        <p className="error" style={{ marginTop: 24 }}>
+          <strong>No se pudo comparar.</strong>
+          <br />
+          {compareError}
+        </p>
+      )}
+
+      {!comparing && compareResult && (
+        <div style={{ marginTop: 24 }}>
+          {compareResult.results.length === 0 ? (
+            <p className="fare-sub">Ninguna aerolínea devolvió tarifa para esta búsqueda.</p>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Aerolínea</th>
+                    <th>Total ARS</th>
+                    <th>≈ Total USD</th>
+                    <th>Por pasajero</th>
+                    <th>Asientos</th>
+                    <th>Salida</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...compareResult.results]
+                    .sort((a, b) => a.totalUsd - b.totalUsd)
+                    .map((r, i) => (
+                      <tr key={r.provider}>
+                        <td>
+                          {r.carrier ?? r.provider}
+                          {i === 0 && (
+                            <span className="pill ok" style={{ marginLeft: 8 }}>
+                              más barata
+                            </span>
+                          )}
+                        </td>
+                        <td className="mono">
+                          {r.nativeCurrency === 'ARS' ? `ARS ${formatArs(r.totalNative)}` : '—'}
+                        </td>
+                        <td className="mono">USD {formatUsd(r.totalUsd)}</td>
+                        <td className="mono">
+                          {r.nativeCurrency === 'ARS'
+                            ? `ARS ${formatArs(r.pricePerPaxNative)}`
+                            : `USD ${formatUsd(r.pricePerPaxUsd)}`}
+                        </td>
+                        <td>{r.seatsLeft ?? 's/d'}</td>
+                        <td className="mono">
+                          {r.outboundDeparture
+                            ? new Date(r.outboundDeparture.replace(' ', 'T')).toLocaleString('es-AR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : 's/d'}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {compareResult.errors.length > 0 && (
+            <p className="fare-sub" style={{ marginTop: 12 }}>
+              Sin respuesta de:{' '}
+              {compareResult.errors
+                .map((e) => CARRIER_LABEL[e.carrier] ?? e.carrier)
+                .join(', ')}
+              .
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
