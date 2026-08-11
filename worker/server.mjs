@@ -83,9 +83,15 @@ function normalizeName(s) {
 const DIRECT_CARRIER_NAMES = new Set(Object.values(CARRIERS).map((c) => normalizeName(c.label)));
 
 /**
- * Consulta todos los proveedores disponibles en paralelo para la misma ruta
- * y devuelve los resultados que hayan andado más los errores de los que no,
- * para armar una comparación de precios entre aerolíneas.
+ * Consulta todos los proveedores disponibles para la misma ruta y devuelve
+ * los resultados que hayan andado más los errores de los que no, para armar
+ * una comparación de precios entre aerolíneas.
+ *
+ * Aerolíneas y Kayak van SECUENCIADOS a propósito, no en paralelo: los dos
+ * abren su propio navegador headless, y correrlos al mismo tiempo en el plan
+ * free de Render (CPU/RAM compartidos) hace que uno o los dos den timeout por
+ * falta de recursos — lo confirmamos en producción. JetSMART es un fetch
+ * liviano (sin navegador), así que ese sí va en paralelo con todo.
  *
  * Kayak suma aerolíneas que no podemos scrapear directo (LATAM, Avianca,
  * Copa...), pero sus precios son casi siempre de un revendedor, no el precio
@@ -107,22 +113,20 @@ app.post('/compare', async (req, res) => {
   }
 
   const started = Date.now();
-  const [directEntries, kayakEntry] = await Promise.all([
-    Promise.all(
-      Object.entries(CARRIERS).map(async ([key, carrier]) => {
-        try {
-          const result = await carrier.search(query);
-          return { carrier: key, ok: true, result };
-        } catch (err) {
-          return { carrier: key, ok: false, error: err instanceof Error ? err.message : String(err) };
-        }
-      }),
-    ),
-    searchKayakFares(query).then(
-      (results) => ({ carrier: 'kayak', ok: true, results }),
-      (err) => ({ carrier: 'kayak', ok: false, error: err instanceof Error ? err.message : String(err) }),
-    ),
-  ]);
+  const directEntries = await Promise.all(
+    Object.entries(CARRIERS).map(async ([key, carrier]) => {
+      try {
+        const result = await carrier.search(query);
+        return { carrier: key, ok: true, result };
+      } catch (err) {
+        return { carrier: key, ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    }),
+  );
+  const kayakEntry = await searchKayakFares(query).then(
+    (results) => ({ carrier: 'kayak', ok: true, results }),
+    (err) => ({ carrier: 'kayak', ok: false, error: err instanceof Error ? err.message : String(err) }),
+  );
 
   const results = directEntries.filter((e) => e.ok).map((e) => e.result);
   const errors = directEntries.filter((e) => !e.ok).map((e) => ({ carrier: e.carrier, message: e.error }));
