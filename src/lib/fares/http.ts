@@ -29,7 +29,11 @@ export class HttpFareProvider implements FareProvider {
 
   async search(q: FareQuery): Promise<FareResult> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25_000);
+    // Generoso a propósito: un worker con navegador headless en un host
+    // gratuito (Render free tier) puede tardar 20-30s por tramo, más el
+    // "cold start" de 30-60s si estuvo inactivo. Ida y vuelta son dos tramos
+    // seguidos — el peor caso ronda el minuto y medio.
+    const timeout = setTimeout(() => controller.abort(), 100_000);
 
     let res: Response;
     try {
@@ -46,7 +50,7 @@ export class HttpFareProvider implements FareProvider {
     } catch (err) {
       throw new FareProviderError(
         err instanceof Error && err.name === 'AbortError'
-          ? 'El worker de tarifas no respondió en 25 s'
+          ? 'El worker de tarifas no respondió en 100 s'
           : `No se pudo contactar al worker de tarifas: ${String(err)}`,
         this.name,
       );

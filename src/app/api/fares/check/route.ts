@@ -7,6 +7,8 @@ import { fareKey } from '@/lib/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// El worker de scraping puede tardar hasta ~100s (cold start + navegador).
+export const maxDuration = 110;
 
 interface Body {
   origin?: string;

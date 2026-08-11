@@ -6,7 +6,11 @@ import { daysUntil } from '@/lib/dates';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+// Chequea cada paquete publicado en secuencia. Con el worker de scraping,
+// el primero puede pagar un "cold start" de hasta ~100s; los siguientes van
+// más rápido con el navegador ya despierto. Generoso para no cortar a mitad
+// de la ronda con varios paquetes.
+export const maxDuration = 280;
 
 /**
  * Cron diario (ver vercel.json). Revisa la tarifa real de cada paquete

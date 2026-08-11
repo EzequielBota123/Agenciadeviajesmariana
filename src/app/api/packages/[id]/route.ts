@@ -4,6 +4,9 @@ import { store, type PackageInput } from '@/lib/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// POST fuerza un chequeo de tarifa; el worker de scraping puede tardar
+// hasta ~100s (cold start + navegador).
+export const maxDuration = 110;
 
 type Ctx = { params: Promise<{ id: string }> };
 
