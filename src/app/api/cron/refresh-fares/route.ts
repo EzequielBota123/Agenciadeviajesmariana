@@ -51,6 +51,8 @@ export async function GET(req: Request) {
       results.push({
         packageId: pkg.id,
         title: pkg.title,
+        nativeCurrency: snapshot.nativeCurrency,
+        totalNative: snapshot.totalNative,
         totalUsd: snapshot.totalUsd,
         deltaPct: snapshot.deltaPct,
         seatsLeft: snapshot.seatsLeft,

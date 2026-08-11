@@ -1,4 +1,5 @@
 import { formatDateLong, formatStamp, timeLeft } from '@/lib/dates';
+import { primaryPerPaxLabel, primaryTotalLabel, secondaryTotalLabel } from '@/lib/money';
 import { airportLabel } from './airports';
 import type { FareSnapshot, Quote, TravelPackage } from '@/lib/types';
 
@@ -43,8 +44,9 @@ export function composeQuoteMessage(args: {
     lines.push(`🕗 Preferencia horaria: ${quote.params.timePreference}`);
   }
   lines.push('');
-  lines.push(`💵 USD ${snapshot.pricePerPaxUsd.toLocaleString('es-AR')} por pasajero`);
-  lines.push(`💵 USD ${snapshot.totalUsd.toLocaleString('es-AR')} en total`);
+  lines.push(`💵 ${primaryPerPaxLabel(snapshot)} por pasajero`);
+  const totalSecondary = secondaryTotalLabel(snapshot);
+  lines.push(`💵 ${primaryTotalLabel(snapshot)} en total${totalSecondary ? ` (${totalSecondary})` : ''}`);
   if (snapshot.carrier) lines.push(`🛫 Operado por ${snapshot.carrier}`);
   if (snapshot.seatsLeft !== null) {
     lines.push(
@@ -72,6 +74,7 @@ export function composeQuoteMessage(args: {
 /** Nota corta para el timeline interno cuando se registra una tarifa. */
 export function composeFareNote(snapshot: FareSnapshot): string {
   const delta = fareDeltaLabel(snapshot);
-  const base = `Tarifa ${snapshot.provider}: USD ${snapshot.totalUsd} (${snapshot.pax} pax) para el ${snapshot.departDate}`;
+  const secondary = secondaryTotalLabel(snapshot);
+  const base = `Tarifa ${snapshot.provider}: ${primaryTotalLabel(snapshot)}${secondary ? ` (${secondary})` : ''} (${snapshot.pax} pax) para el ${snapshot.departDate}`;
   return delta ? `${base} — ${delta}` : base;
 }

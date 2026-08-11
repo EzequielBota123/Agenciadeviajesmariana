@@ -69,8 +69,26 @@ consulta y el aviso de que mañana puede variar.
 | Valor | Qué hace | Cuándo usarlo |
 |---|---|---|
 | `mock` *(default)* | Simulador determinístico por día: la misma consulta el mismo día da el mismo precio, y al día siguiente cambia. Modela ocupación, urgencia por cercanía de la fecha y shocks de demanda. | Demo y desarrollo. Es a propósito determinístico: si fuera random por request, el "subió/bajó" sería ruido y no se podría demostrar la premisa del producto. |
-| `amadeus` | Amadeus Self-Service (Flight Offers Search). Tarifas reales de Aerolíneas Argentinas, LATAM, Copa, etc. | Producción. |
-| `http` | Delega a un worker propio vía POST JSON. | Cuando necesitás scraping o un GDS con sesión persistente. |
+| `amadeus` | Amadeus Self-Service (Flight Offers Search). **El portal self-service de Amadeus se dio de baja en julio 2026** — hoy solo queda su vía "Enterprise", con proceso de ventas. Este proveedor sigue en el código por si en algún momento se consigue acceso. | No disponible por ahora. |
+| `http` | Delega a un worker propio vía POST JSON. Es el que usa `worker/` (scraping de Aerolíneas Argentinas — ver abajo). | Cuando tenés un worker propio corriendo (scraping, GDS con sesión persistente, o la API de Despegar el día que la consigas). |
+
+### El worker de Aerolíneas Argentinas (`worker/`)
+
+Es un scraper real, con navegador headless (Playwright), que consulta
+`aerolineas.com.ar` como lo haría una persona — hace falta así porque la
+búsqueda del sitio exige un token que se genera pasando reCAPTCHA en el
+navegador, no se puede pedir con un simple `fetch`. Ya está probado contra el
+sitio real y trae precios, asientos y horarios genuinos.
+
+**No corre en Vercel** — necesita un proceso persistente (Railway, Render,
+Fly.io, un VPS, o tu propia máquina mientras probás). Instrucciones completas,
+riesgos (es scraping, no una API oficial: depende de que el sitio no cambie de
+diseño) y cómo conectarlo: **`worker/README.md`**.
+
+Los precios de cabotaje vienen en **pesos argentinos** — el worker los
+convierte a un USD aproximado con la cotización oficial de
+[DolarAPI](https://dolarapi.com), y la app muestra las dos cifras siempre que
+la moneda nativa no sea dólares (`ARS 215.054 · ≈ USD 141,48`).
 
 **Sobre scrapear la web de la aerolínea directamente:** lo pediste así y se puede hacer, pero no
 desde acá, por tres razones concretas. Va contra los términos de uso de las aerolíneas; las

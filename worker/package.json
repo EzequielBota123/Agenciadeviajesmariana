@@ -1,0 +1,16 @@
+{
+  "name": "tarifa-viva-worker-aerolineas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Worker aparte que consulta tarifas reales de Aerolíneas Argentinas con un navegador headless. No corre en Vercel — necesita un host con proceso persistente (Railway, Render, Fly.io, un VPS, o tu propia máquina).",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node server.mjs",
+    "postinstall": "playwright install --with-deps chromium"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "playwright": "^1.62.1"
+  }
+}

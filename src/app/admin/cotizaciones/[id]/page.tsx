@@ -3,6 +3,13 @@ import { QuoteActions } from '@/components/QuoteActions';
 import { airportLabel } from '@/lib/agent/airports';
 import { fareDeltaLabel } from '@/lib/agent/reply';
 import { formatDate, formatStamp, isExpired, timeLeft } from '@/lib/dates';
+import {
+  formatArs,
+  formatUsd,
+  primaryPerPaxLabel,
+  secondaryPerPaxLabel,
+  secondaryTotalLabel,
+} from '@/lib/money';
 import { store } from '@/lib/store';
 import { quoteUrl } from '@/lib/urls';
 import { totalPax } from '@/lib/types';
@@ -92,11 +99,15 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
             <div className="card">
               <h4 style={{ marginBottom: 14 }}>Última tarifa</h4>
               <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                <span style={{ fontSize: 16, color: 'var(--muted)', marginRight: 8 }}>USD</span>
-                {latest.totalUsd.toLocaleString('es-AR')}
+                <span style={{ fontSize: 16, color: 'var(--muted)', marginRight: 8 }}>{latest.nativeCurrency}</span>
+                {latest.nativeCurrency === 'ARS' ? formatArs(latest.totalNative) : formatUsd(latest.totalUsd)}
               </div>
-              <p style={{ color: 'var(--muted)', fontSize: 13, fontFamily: 'var(--mono)' }}>
-                USD {latest.pricePerPaxUsd.toLocaleString('es-AR')} por pasajero ·{' '}
+              {secondaryTotalLabel(latest) && (
+                <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 2 }}>{secondaryTotalLabel(latest)}</p>
+              )}
+              <p style={{ color: 'var(--muted)', fontSize: 13, fontFamily: 'var(--mono)', marginTop: 8 }}>
+                {primaryPerPaxLabel(latest)} por pasajero
+                {secondaryPerPaxLabel(latest) ? ` (${secondaryPerPaxLabel(latest)})` : ''} ·{' '}
                 {latest.carrier ?? 'sin aerolínea informada'}
               </p>
               <p style={{ marginTop: 10, fontSize: 13.5 }}>
@@ -150,7 +161,9 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
                       <tr key={s.id}>
                         <td className="mono">{formatStamp(s.fetchedAt)}</td>
                         <td className="mono">{s.pax}</td>
-                        <td className="mono">USD {s.totalUsd.toLocaleString('es-AR')}</td>
+                        <td className="mono">
+                          {s.nativeCurrency === 'ARS' ? `ARS ${formatArs(s.totalNative)}` : `USD ${formatUsd(s.totalUsd)}`}
+                        </td>
                         <td className="mono">
                           {s.deltaPct === null
                             ? '—'

@@ -8,13 +8,21 @@ export interface FareQuery {
   timePreference?: string;
 }
 
+export type FareCurrency = 'USD' | 'ARS';
+
 export interface FareResult {
   provider: string;
-  currency: 'USD';
-  /** Precio por pasajero, impuestos incluidos. */
+  /** Moneda en la que la aerolínea/proveedor cotizó originalmente. */
+  nativeCurrency: FareCurrency;
+  /** Precio por pasajero en la moneda nativa, impuestos incluidos. */
+  pricePerPaxNative: number;
+  /** pricePerPaxNative * pax. */
+  totalNative: number;
+  /** Siempre en USD: igual al nativo si ya era USD, o convertido si era ARS. */
   pricePerPaxUsd: number;
-  /** pricePerPaxUsd * pax. */
   totalUsd: number;
+  /** Cotización usada para convertir ARS→USD. null si nativeCurrency ya era USD. */
+  exchangeRate: number | null;
   /** Asientos que la aerolínea declara disponibles en esa clase tarifaria. */
   seatsLeft: number | null;
   carrier: string | null;

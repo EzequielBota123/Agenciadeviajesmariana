@@ -4,6 +4,7 @@ import { airportLabel } from '@/lib/agent/airports';
 import { adminTokenConfigured } from '@/lib/auth';
 import { daysUntil, formatDate, formatStamp } from '@/lib/dates';
 import { activeProviderName } from '@/lib/fares';
+import { primaryTotalLabel, secondaryTotalLabel } from '@/lib/money';
 import { needsAttention } from '@/lib/quoting';
 import { store, storageMode } from '@/lib/store';
 import { BOARD_LABEL, totalPax, type FareSnapshot, type Quote, type TravelPackage } from '@/lib/types';
@@ -165,9 +166,12 @@ export default async function AdminPage() {
                       <td className="mono">
                         {snapshot ? (
                           <>
-                            <strong style={{ color: 'var(--amber)' }}>
-                              USD {snapshot.totalUsd.toLocaleString('es-AR')}
-                            </strong>
+                            <strong style={{ color: 'var(--amber)' }}>{primaryTotalLabel(snapshot)}</strong>
+                            {secondaryTotalLabel(snapshot) && (
+                              <div style={{ color: 'var(--muted)', fontSize: 11.5 }}>
+                                {secondaryTotalLabel(snapshot)}
+                              </div>
+                            )}
                             {snapshot.seatsLeft !== null && (
                               <div style={{ color: 'var(--muted)', fontSize: 12 }}>
                                 {snapshot.seatsLeft} lugares
@@ -252,9 +256,14 @@ export default async function AdminPage() {
                     </td>
                     <td className="mono">
                       {snapshot ? (
-                        <strong style={{ color: 'var(--amber)' }}>
-                          USD {snapshot.totalUsd.toLocaleString('es-AR')}
-                        </strong>
+                        <>
+                          <strong style={{ color: 'var(--amber)' }}>{primaryTotalLabel(snapshot)}</strong>
+                          {secondaryTotalLabel(snapshot) && (
+                            <div style={{ color: 'var(--muted)', fontSize: 11.5 }}>
+                              {secondaryTotalLabel(snapshot)}
+                            </div>
+                          )}
+                        </>
                       ) : (
                         '—'
                       )}

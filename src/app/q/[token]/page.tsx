@@ -3,6 +3,13 @@ import { Countdown } from '@/components/Countdown';
 import { airportLabel } from '@/lib/agent/airports';
 import { DISCLAIMER, fareDeltaLabel } from '@/lib/agent/reply';
 import { formatDateLong, formatStamp, isExpired } from '@/lib/dates';
+import {
+  formatArs,
+  formatUsd,
+  primaryPerPaxLabel,
+  secondaryPerPaxLabel,
+  secondaryTotalLabel,
+} from '@/lib/money';
 import { store } from '@/lib/store';
 import { BOARD_LABEL, totalPax } from '@/lib/types';
 
@@ -60,11 +67,15 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
           ) : (
             <>
               <div className="quote-price">
-                <small>USD</small>
-                {latest.totalUsd.toLocaleString('es-AR')}
+                <small>{latest.nativeCurrency}</small>
+                {latest.nativeCurrency === 'ARS' ? formatArs(latest.totalNative) : formatUsd(latest.totalUsd)}
               </div>
+              {secondaryTotalLabel(latest) && (
+                <p style={{ color: 'var(--muted)', marginTop: 4, fontSize: 14 }}>{secondaryTotalLabel(latest)}</p>
+              )}
               <p style={{ color: 'var(--muted)', marginTop: 8, fontFamily: 'var(--mono)', fontSize: 13 }}>
-                USD {latest.pricePerPaxUsd.toLocaleString('es-AR')} por pasajero ·{' '}
+                {primaryPerPaxLabel(latest)} por pasajero
+                {secondaryPerPaxLabel(latest) ? ` (${secondaryPerPaxLabel(latest)})` : ''} ·{' '}
                 {latest.pax} {latest.pax === 1 ? 'pasajero' : 'pasajeros'}
               </p>
 

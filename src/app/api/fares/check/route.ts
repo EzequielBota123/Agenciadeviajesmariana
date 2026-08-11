@@ -59,7 +59,13 @@ export async function POST(req: Request) {
   }
 
   try {
-    const previous = await store().latestSnapshotForKey({ origin, destination, departDate, pax });
+    const previous = await store().latestSnapshotForKey({
+      origin,
+      destination,
+      departDate,
+      returnDate: body.returnDate ?? null,
+      pax,
+    });
 
     const fare = await lookupFare({
       origin,
@@ -82,8 +88,12 @@ export async function POST(req: Request) {
       provider: fare.provider,
       carrier: fare.carrier,
       cabin: fare.cabin,
+      nativeCurrency: fare.nativeCurrency,
+      pricePerPaxNative: fare.pricePerPaxNative,
+      totalNative: fare.totalNative,
       pricePerPaxUsd: fare.pricePerPaxUsd,
       totalUsd: fare.totalUsd,
+      exchangeRate: fare.exchangeRate,
       seatsLeft: fare.seatsLeft,
       fetchedAt: fare.fetchedAt,
       validUntil: fare.validUntil,

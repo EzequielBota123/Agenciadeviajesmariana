@@ -83,6 +83,8 @@ export interface QuoteEvent {
   createdAt: string;
 }
 
+export type FareCurrency = 'USD' | 'ARS';
+
 export interface FareSnapshot {
   id: string;
   quoteId: string | null;
@@ -95,24 +97,37 @@ export interface FareSnapshot {
   provider: string;
   carrier: string | null;
   cabin: string;
+  /** Moneda en la que cotizó la aerolínea. */
+  nativeCurrency: FareCurrency;
+  pricePerPaxNative: number;
+  totalNative: number;
+  /** Siempre en USD (igual al nativo si ya era USD, o convertido). */
   pricePerPaxUsd: number;
   totalUsd: number;
+  /** Cotización ARS→USD usada, si hubo conversión. */
+  exchangeRate: number | null;
   seatsLeft: number | null;
   fetchedAt: string; // ISO
   validUntil: string; // ISO — fin del día en hora argentina
-  deltaPct: number | null; // vs. el último chequeo de la misma combinación
+  deltaPct: number | null; // vs. el último chequeo de la misma combinación, medido en USD
   previousTotalUsd: number | null;
   raw: unknown;
 }
 
-/** Clave de comparación de una tarifa: misma ruta, misma fecha, mismos pax. */
+/**
+ * Clave de comparación de una tarifa: misma ruta, misma fecha de ida, misma
+ * fecha de vuelta (o "solo ida" si no hay) y mismos pax. Sin la vuelta en la
+ * clave, un chequeo solo-ida y uno ida-y-vuelta de la misma fecha de salida
+ * se comparan como si fueran la misma tarifa — el delta sale falso.
+ */
 export function fareKey(s: {
   origin: string;
   destination: string;
   departDate: string;
+  returnDate?: string | null;
   pax: number;
 }): string {
-  return `${s.origin}-${s.destination}|${s.departDate}|${s.pax}`;
+  return `${s.origin}-${s.destination}|${s.departDate}|${s.returnDate ?? 'solo-ida'}|${s.pax}`;
 }
 
 export function totalPax(p: Pick<QuoteParams, 'paxAdults' | 'paxChildren'>): number {

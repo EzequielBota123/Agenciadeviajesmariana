@@ -11,6 +11,11 @@ import { FareProviderError, type FareProvider, type FareQuery, type FareResult }
 // Contrato mínimo que tu worker tiene que devolver:
 //   { "pricePerPaxUsd": 742, "seatsLeft": 4, "carrier": "Aerolíneas Argentinas" }
 // El resto (totalUsd, validUntil, fetchedAt) lo completa esta clase.
+//
+// Si el worker cotiza en una moneda que no es dólares (ej. tarifas de
+// cabotaje en pesos), puede mandar además `nativeCurrency`, `pricePerPaxNative`,
+// `totalNative` y `exchangeRate` — la conversión a USD la hace el worker mismo,
+// porque es quien sabe con qué cotización trabajó.
 
 export class HttpFareProvider implements FareProvider {
   readonly name = 'http';
@@ -68,11 +73,17 @@ export class HttpFareProvider implements FareProvider {
     }
 
     const now = new Date();
+    const perPaxUsd = Math.round(perPax * 100) / 100;
+    const totalUsd = Math.round((raw.totalUsd ?? perPax * q.pax) * 100) / 100;
+
     return {
       provider: raw.provider ?? this.name,
-      currency: 'USD',
-      pricePerPaxUsd: Math.round(perPax * 100) / 100,
-      totalUsd: Math.round((raw.totalUsd ?? perPax * q.pax) * 100) / 100,
+      nativeCurrency: raw.nativeCurrency ?? 'USD',
+      pricePerPaxNative: raw.pricePerPaxNative ?? perPaxUsd,
+      totalNative: raw.totalNative ?? totalUsd,
+      pricePerPaxUsd: perPaxUsd,
+      totalUsd,
+      exchangeRate: raw.exchangeRate ?? null,
       seatsLeft: raw.seatsLeft ?? null,
       carrier: raw.carrier ?? null,
       cabin: raw.cabin ?? q.cabin ?? 'ECONOMY',

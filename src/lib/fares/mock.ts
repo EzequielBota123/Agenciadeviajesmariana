@@ -118,9 +118,12 @@ export class MockFareProvider implements FareProvider {
 
     return {
       provider: this.name,
-      currency: 'USD',
+      nativeCurrency: 'USD',
+      pricePerPaxNative: pricePerPax,
+      totalNative: pricePerPax * q.pax,
       pricePerPaxUsd: pricePerPax,
       totalUsd: pricePerPax * q.pax,
+      exchangeRate: null,
       seatsLeft,
       carrier: CARRIERS[route] ?? 'Aerolíneas Argentinas',
       cabin: q.cabin ?? 'ECONOMY',

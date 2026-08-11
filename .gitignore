@@ -11,3 +11,14 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# Metadata local de Claude Code / plugins de agente (no del proyecto)
+.agents/
+.claude/
+skills-lock.json
+
+# Worker: node_modules y navegador de Playwright son pesados, no van al repo
+worker/node_modules
+
+worker/worker.log
+worker/*.log

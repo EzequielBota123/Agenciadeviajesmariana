@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { formatArs, formatUsd, secondaryPerPaxLabel, secondaryTotalLabel } from '@/lib/money';
 import type { FareSnapshot } from '@/lib/types';
 
 interface CheckResponse {
@@ -138,11 +139,21 @@ export function FareChecker() {
                 {snapshot.origin} → {snapshot.destination} · {snapshot.departDate} · {snapshot.pax} pax
               </div>
               <div className="fare-amount">
-                <span className="cur">USD</span>
-                <span>{snapshot.totalUsd.toLocaleString('es-AR')}</span>
+                <span className="cur">{snapshot.nativeCurrency}</span>
+                <span>
+                  {snapshot.nativeCurrency === 'ARS'
+                    ? formatArs(snapshot.totalNative)
+                    : formatUsd(snapshot.totalUsd)}
+                </span>
               </div>
+              {secondaryTotalLabel(snapshot) && (
+                <div className="fare-sub">{secondaryTotalLabel(snapshot)}</div>
+              )}
               <div className="fare-sub">
-                USD {snapshot.pricePerPaxUsd.toLocaleString('es-AR')} por pasajero
+                {snapshot.nativeCurrency === 'ARS'
+                  ? `ARS ${formatArs(snapshot.pricePerPaxNative)} por pasajero`
+                  : `USD ${formatUsd(snapshot.pricePerPaxUsd)} por pasajero`}
+                {secondaryPerPaxLabel(snapshot) ? ` (${secondaryPerPaxLabel(snapshot)})` : ''}
                 {snapshot.carrier ? ` · ${snapshot.carrier}` : ''}
               </div>
 
@@ -169,6 +180,7 @@ export function FareChecker() {
                   asientos disponibles: {snapshot.seatsLeft ?? 's/d'}
                 </span>
                 <span>fuente: {result.simulated ? 'simulador' : result.provider}</span>
+                {snapshot.exchangeRate && <span>dólar usado: ARS {formatArs(snapshot.exchangeRate)}</span>}
               </div>
 
               {result.fallbackReason && (

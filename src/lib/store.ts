@@ -75,6 +75,7 @@ export interface Store {
     origin: string;
     destination: string;
     departDate: string;
+    returnDate?: string | null;
     pax: number;
   }): Promise<FareSnapshot | null>;
   listSnapshots(opts: { quoteId?: string; packageId?: string; limit?: number }): Promise<FareSnapshot[]>;
@@ -392,6 +393,7 @@ class MemoryStore implements Store {
     origin: string;
     destination: string;
     departDate: string;
+    returnDate?: string | null;
     pax: number;
   }): Promise<FareSnapshot | null> {
     const wanted = fareKey(key);
@@ -483,8 +485,12 @@ function rowToSnapshot(r: any): FareSnapshot {
     provider: r.provider,
     carrier: r.carrier,
     cabin: r.cabin,
+    nativeCurrency: (r.native_currency ?? 'USD') as FareSnapshot['nativeCurrency'],
+    pricePerPaxNative: num(r.price_per_pax_native ?? r.price_per_pax_usd),
+    totalNative: num(r.total_native ?? r.total_usd),
     pricePerPaxUsd: num(r.price_per_pax_usd),
     totalUsd: num(r.total_usd),
+    exchangeRate: numOrNull(r.exchange_rate),
     seatsLeft: numOrNull(r.seats_left),
     fetchedAt: asIso(r.fetched_at),
     validUntil: asIso(r.valid_until),
@@ -650,13 +656,16 @@ class PostgresStore implements Store {
     await this.sql`
       insert into fare_snapshots (
         id, quote_id, package_id, origin, destination, depart_date, return_date, pax,
-        provider, carrier, cabin, price_per_pax_usd, total_usd, seats_left,
+        provider, carrier, cabin, native_currency, price_per_pax_native, total_native,
+        price_per_pax_usd, total_usd, exchange_rate, seats_left,
         fetched_at, valid_until, delta_pct, previous_total_usd, raw
       ) values (
         ${snapshot.id}, ${snapshot.quoteId}, ${snapshot.packageId}, ${snapshot.origin},
         ${snapshot.destination}, ${snapshot.departDate}, ${snapshot.returnDate}, ${snapshot.pax},
-        ${snapshot.provider}, ${snapshot.carrier}, ${snapshot.cabin}, ${snapshot.pricePerPaxUsd},
-        ${snapshot.totalUsd}, ${snapshot.seatsLeft}, ${snapshot.fetchedAt}, ${snapshot.validUntil},
+        ${snapshot.provider}, ${snapshot.carrier}, ${snapshot.cabin}, ${snapshot.nativeCurrency},
+        ${snapshot.pricePerPaxNative}, ${snapshot.totalNative}, ${snapshot.pricePerPaxUsd},
+        ${snapshot.totalUsd}, ${snapshot.exchangeRate}, ${snapshot.seatsLeft},
+        ${snapshot.fetchedAt}, ${snapshot.validUntil},
         ${snapshot.deltaPct}, ${snapshot.previousTotalUsd},
         ${snapshot.raw ? JSON.stringify(snapshot.raw) : null}::jsonb
       )
@@ -668,6 +677,7 @@ class PostgresStore implements Store {
     origin: string;
     destination: string;
     departDate: string;
+    returnDate?: string | null;
     pax: number;
   }): Promise<FareSnapshot | null> {
     const rows = await this.sql`
@@ -675,6 +685,7 @@ class PostgresStore implements Store {
       where origin = ${key.origin}
         and destination = ${key.destination}
         and depart_date = ${key.departDate}
+        and return_date is not distinct from ${key.returnDate ?? null}
         and pax = ${key.pax}
       order by fetched_at desc
       limit 1

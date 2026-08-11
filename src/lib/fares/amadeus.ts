@@ -113,11 +113,17 @@ export class AmadeusFareProvider implements FareProvider {
     const firstSegment = cheapest.itineraries?.[0]?.segments?.[0];
     const now = new Date();
 
+    const perPaxRounded = Math.round(perPax * 100) / 100;
+    const totalRounded = Math.round(total * 100) / 100;
+
     return {
       provider: this.name,
-      currency: 'USD',
-      pricePerPaxUsd: Math.round(perPax * 100) / 100,
-      totalUsd: Math.round(total * 100) / 100,
+      nativeCurrency: 'USD',
+      pricePerPaxNative: perPaxRounded,
+      totalNative: totalRounded,
+      pricePerPaxUsd: perPaxRounded,
+      totalUsd: totalRounded,
+      exchangeRate: null,
       seatsLeft: cheapest.numberOfBookableSeats ?? null,
       carrier: resolveCarrier(json, cheapest),
       cabin:

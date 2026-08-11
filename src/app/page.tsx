@@ -3,6 +3,7 @@ import { MessageIntake } from '@/components/MessageIntake';
 import { agentEngine } from '@/lib/agent/parse';
 import { activeProviderName } from '@/lib/fares';
 import { formatDate } from '@/lib/dates';
+import { primaryTotalLabel, secondaryTotalLabel } from '@/lib/money';
 import { store, storageMode } from '@/lib/store';
 import { BOARD_LABEL, type FareSnapshot, type TravelPackage } from '@/lib/types';
 
@@ -102,7 +103,18 @@ export default async function HomePage() {
                   </div>
                   <StatusCell snapshot={snapshot} />
                   <div className="price">
-                    {snapshot ? `USD ${snapshot.totalUsd.toLocaleString('es-AR')}` : '—'}
+                    {snapshot ? (
+                      <>
+                        {primaryTotalLabel(snapshot)}
+                        {secondaryTotalLabel(snapshot) && (
+                          <div style={{ color: 'var(--muted)', fontWeight: 400, fontSize: 11.5 }}>
+                            {secondaryTotalLabel(snapshot)}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      '—'
+                    )}
                   </div>
                   <div>{snapshot ? `hoy ${formatDate(snapshot.fetchedAt.slice(0, 10))}` : 'sin datos'}</div>
                 </div>
