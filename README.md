@@ -80,10 +80,19 @@ búsqueda del sitio exige un token que se genera pasando reCAPTCHA en el
 navegador, no se puede pedir con un simple `fetch`. Ya está probado contra el
 sitio real y trae precios, asientos y horarios genuinos.
 
-**No corre en Vercel** — necesita un proceso persistente (Railway, Render,
-Fly.io, un VPS, o tu propia máquina mientras probás). Instrucciones completas,
-riesgos (es scraping, no una API oficial: depende de que el sitio no cambie de
-diseño) y cómo conectarlo: **`worker/README.md`**.
+**No corre en Vercel** — necesita un proceso persistente. Ya está desplegado en
+**Render** (plan free, sin tarjeta): `https://tarifa-viva-worker.onrender.com`.
+Producción ya apunta ahí (`FARE_PROVIDER=http` + `FARE_WORKER_URL` cargados en
+Vercel). Instrucciones completas, riesgos (es scraping, no una API oficial:
+depende de que el sitio no cambie de diseño) y cómo redeployarlo si hace falta:
+**`worker/README.md`**.
+
+> ⚠️ El plan free de Render **duerme el servicio a los 15 minutos de
+> inactividad** y tarda 30-60s en despertar en el próximo pedido, sumado a los
+> 15-25s que ya tarda cada búsqueda real. Por eso el timeout del lado de la
+> app está en 100s. Si en algún momento esto pasa a producción de verdad con
+> clientes reales, conviene pasar a un plan pago (Render Starter, ~USD 7/mes)
+> para que no duerma.
 
 Los precios de cabotaje vienen en **pesos argentinos** — el worker los
 convierte a un USD aproximado con la cotización oficial de
