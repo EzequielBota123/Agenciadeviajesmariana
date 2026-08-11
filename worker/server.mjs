@@ -1,6 +1,7 @@
 import express from 'express';
 import { searchAerolineasFare, closeBrowser } from './scraper.mjs';
 import { searchJetsmartFare } from './jetsmart.mjs';
+import { searchKayakFares } from './kayak.mjs';
 
 const app = express();
 app.use(express.json());
@@ -70,10 +71,28 @@ app.post('/', async (req, res) => {
   }
 });
 
+// Kayak a veces devuelve la misma aerolínea bajo más de un código IATA
+// interno (JetSMART salió como "JA" y también como "WJ" en pruebas), así que
+// filtrar por código no alcanza. Comparamos por nombre normalizado (sin
+// tildes, minúsculas): Kayak escribe "Aerolineas Argentinas" sin tilde, un
+// match exacto contra nuestra etiqueta tampoco serviría.
+const COMBINING_MARKS = new RegExp('[\\u0300-\\u036f]', 'g');
+function normalizeName(s) {
+  return s.normalize('NFD').replace(COMBINING_MARKS, '').toLowerCase().trim();
+}
+const DIRECT_CARRIER_NAMES = new Set(Object.values(CARRIERS).map((c) => normalizeName(c.label)));
+
 /**
  * Consulta todos los proveedores disponibles en paralelo para la misma ruta
  * y devuelve los resultados que hayan andado más los errores de los que no,
  * para armar una comparación de precios entre aerolíneas.
+ *
+ * Kayak suma aerolíneas que no podemos scrapear directo (LATAM, Avianca,
+ * Copa...), pero sus precios son casi siempre de un revendedor, no el precio
+ * directo de la aerolínea — por eso, si Kayak trae una oferta de una
+ * aerolínea que YA tenemos scrapeada directo (Aerolíneas/JetSMART), la
+ * descartamos: el precio directo es más confiable y no tiene sentido mostrar
+ * dos números distintos para la misma compañía en la misma tabla.
  */
 app.post('/compare', async (req, res) => {
   if (!isAuthorized(req)) {
@@ -88,19 +107,33 @@ app.post('/compare', async (req, res) => {
   }
 
   const started = Date.now();
-  const entries = await Promise.all(
-    Object.entries(CARRIERS).map(async ([key, carrier]) => {
-      try {
-        const result = await carrier.search(query);
-        return { carrier: key, ok: true, result };
-      } catch (err) {
-        return { carrier: key, ok: false, error: err instanceof Error ? err.message : String(err) };
-      }
-    }),
-  );
+  const [directEntries, kayakEntry] = await Promise.all([
+    Promise.all(
+      Object.entries(CARRIERS).map(async ([key, carrier]) => {
+        try {
+          const result = await carrier.search(query);
+          return { carrier: key, ok: true, result };
+        } catch (err) {
+          return { carrier: key, ok: false, error: err instanceof Error ? err.message : String(err) };
+        }
+      }),
+    ),
+    searchKayakFares(query).then(
+      (results) => ({ carrier: 'kayak', ok: true, results }),
+      (err) => ({ carrier: 'kayak', ok: false, error: err instanceof Error ? err.message : String(err) }),
+    ),
+  ]);
 
-  const results = entries.filter((e) => e.ok).map((e) => e.result);
-  const errors = entries.filter((e) => !e.ok).map((e) => ({ carrier: e.carrier, message: e.error }));
+  const results = directEntries.filter((e) => e.ok).map((e) => e.result);
+  const errors = directEntries.filter((e) => !e.ok).map((e) => ({ carrier: e.carrier, message: e.error }));
+
+  if (kayakEntry.ok) {
+    for (const r of kayakEntry.results) {
+      if (!DIRECT_CARRIER_NAMES.has(normalizeName(r.carrier ?? ''))) results.push(r);
+    }
+  } else {
+    errors.push({ carrier: 'kayak', message: kayakEntry.error });
+  }
 
   console.log(
     `[worker] /compare ${query.origin}-${query.destination} ${query.departDate} x${query.pax} -> ` +

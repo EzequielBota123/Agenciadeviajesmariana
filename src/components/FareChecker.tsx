@@ -24,6 +24,7 @@ interface CompareResponse {
 const CARRIER_LABEL: Record<string, string> = {
   aerolineas: 'Aerolíneas Argentinas',
   jetsmart: 'JetSMART',
+  kayak: 'Kayak',
 };
 
 const ROUTES = [
@@ -277,20 +278,32 @@ export function FareChecker() {
                     .sort((a, b) => a.totalUsd - b.totalUsd)
                     .map((r, i) => {
                       const [origin, destination] = route.split('|');
-                      const link = bookingUrl({
-                        carrier: r.carrier,
-                        origin,
-                        destination,
-                        departDate: date,
-                        paxAdults: pax,
-                      });
+                      const viaKayak = r.provider === 'kayak';
+                      const kayakUrl =
+                        viaKayak && r.raw && typeof r.raw === 'object' && 'kayakBookingUrl' in r.raw
+                          ? ((r.raw as { kayakBookingUrl?: string | null }).kayakBookingUrl ?? null)
+                          : null;
+                      const link =
+                        kayakUrl ??
+                        bookingUrl({
+                          carrier: r.carrier,
+                          origin,
+                          destination,
+                          departDate: date,
+                          paxAdults: pax,
+                        });
                       return (
-                        <tr key={r.provider}>
+                        <tr key={`${r.provider}-${r.carrier}-${i}`}>
                           <td>
                             {r.carrier ?? r.provider}
                             {i === 0 && (
                               <span className="pill ok" style={{ marginLeft: 8 }}>
                                 más barata
+                              </span>
+                            )}
+                            {viaKayak && (
+                              <span className="pill" style={{ marginLeft: 8 }} title="Precio de un revendedor visto en Kayak, no el precio directo de la aerolínea">
+                                vía Kayak
                               </span>
                             )}
                           </td>
@@ -317,7 +330,7 @@ export function FareChecker() {
                           <td>
                             {link && (
                               <a href={link} target="_blank" rel="noopener noreferrer" className="pill">
-                                reservar →
+                                {viaKayak ? 'ver oferta →' : 'reservar →'}
                               </a>
                             )}
                           </td>
@@ -327,6 +340,14 @@ export function FareChecker() {
                 </tbody>
               </table>
             </div>
+          )}
+
+          {compareResult.results.some((r) => r.provider === 'kayak') && (
+            <p className="fare-sub" style={{ marginTop: 12 }}>
+              Las filas marcadas <strong>"vía Kayak"</strong> son de un metabuscador: suman
+              aerolíneas que no cotizamos directo (LATAM, Avianca, Copa...), pero el precio suele
+              ser de un revendedor (Kiwi, Decolar, CTrip...), no la tarifa oficial de la aerolínea.
+            </p>
           )}
 
           {compareResult.errors.length > 0 && (

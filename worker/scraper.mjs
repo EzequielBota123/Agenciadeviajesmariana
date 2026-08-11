@@ -19,7 +19,7 @@ const USER_AGENT =
 
 let browserPromise = null;
 
-function getBrowser() {
+export function getBrowser() {
   if (!browserPromise) {
     browserPromise = chromium.launch({ headless: true });
   }

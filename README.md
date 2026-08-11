@@ -108,17 +108,39 @@ HTML de su home la URL de su motor de reservas (patrón Navitaire,
 precio ya convertido a ARS y USD, sin token ni cookies.
 
 `POST /api/fares/compare` en la app le pega a `POST /compare` en el worker,
-que corre Aerolíneas y JetSMART **en paralelo** y devuelve ambos resultados
-(o el error del que falló) para poder mostrar una comparación de precios
-lado a lado. Lo usa el botón "Comparar entre aerolíneas" del simulador en la
-home.
+que corre Aerolíneas, JetSMART y Kayak **en paralelo** y devuelve todos los
+resultados (o el error del que falló) para poder mostrar una comparación de
+precios lado a lado. Lo usa el botón "Comparar entre aerolíneas" del
+simulador en la home.
 
-**Se evaluaron también LATAM, Flybondi y Despegar y no se pudieron sumar:**
-LATAM devuelve 403 al toque (bloqueo tipo Akamai); Flybondi mete el buscador
-real detrás de un Cloudflare Managed Challenge que nunca resuelve en headless;
-Despegar tiene DataDome + Cloudflare encima y devuelve 403 con página en
-blanco incluso con un browser real. En los tres casos se paró ahí — nada de
-proxies, rotación de IP o resolución de CAPTCHA para forzarlo.
+**Se evaluaron también LATAM, Flybondi, Despegar, Avianca y Sky Airline y no
+se pudieron sumar directo:** LATAM y Avianca devuelven 403 al toque (bloqueo
+tipo Akamai); Flybondi mete el buscador real detrás de un Cloudflare Managed
+Challenge que nunca resuelve en headless; Despegar tiene DataDome + Cloudflare
+encima y devuelve 403 con página en blanco incluso con un browser real; Sky
+Airline no bloquea pero su motor de reservas exige reCAPTCHA como Aerolíneas
+(scrapeable en principio, pero no se construyó — quedó afuera por prioridad).
+En los casos bloqueados se paró ahí — nada de proxies, rotación de IP o
+resolución de CAPTCHA para forzarlo.
+
+### El agregador: Kayak (`worker/kayak.mjs`)
+
+En vez de perseguir aerolínea por aerolínea, `/compare` también consulta
+**Kayak** — un metabuscador que trae ofertas de muchas aerolíneas de una sola
+búsqueda, incluidas las que bloquean directo (LATAM, Avianca, Copa, Sky
+Airline...). Técnicamente: Kayak arma la búsqueda navegando a
+`kayak.com.ar/flights/ORIGEN-DESTINO/FECHA` y completa resultados con
+*polling* a un endpoint JSON interno (`/i/api/search/dynamic/flights/poll`,
+sin auth) hasta que el estado pasa a `complete`.
+
+**Ojo con la fuente:** el precio que da Kayak casi siempre es de un
+**revendedor** (Kiwi, Decolar, CTrip, Airtickets24...), no la tarifa directa
+de la aerolínea — por eso todo resultado que viene de ahí se marca en la UI
+con la etiqueta **"vía Kayak"** y un aviso explícito, para no mostrarlo como
+si fuera un precio oficial. Cuando Kayak devuelve una oferta de una aerolínea
+que ya scrapeamos directo (Aerolíneas/JetSMART), se descarta esa entrada: el
+precio directo es más confiable y no tiene sentido mostrar dos números
+distintos para la misma compañía.
 
 **Sobre scrapear la web de la aerolínea directamente:** lo pediste así y se puede hacer, pero no
 desde acá, por tres razones concretas. Va contra los términos de uso de las aerolíneas; las
