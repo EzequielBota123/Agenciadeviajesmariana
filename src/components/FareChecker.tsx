@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { bookingUrl } from '@/lib/booking';
 import { formatArs, formatUsd, secondaryPerPaxLabel, secondaryTotalLabel } from '@/lib/money';
 import type { FareSnapshot } from '@/lib/types';
 import type { FareResult } from '@/lib/fares/types';
@@ -268,43 +269,61 @@ export function FareChecker() {
                     <th>Por pasajero</th>
                     <th>Asientos</th>
                     <th>Salida</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {[...compareResult.results]
                     .sort((a, b) => a.totalUsd - b.totalUsd)
-                    .map((r, i) => (
-                      <tr key={r.provider}>
-                        <td>
-                          {r.carrier ?? r.provider}
-                          {i === 0 && (
-                            <span className="pill ok" style={{ marginLeft: 8 }}>
-                              más barata
-                            </span>
-                          )}
-                        </td>
-                        <td className="mono">
-                          {r.nativeCurrency === 'ARS' ? `ARS ${formatArs(r.totalNative)}` : '—'}
-                        </td>
-                        <td className="mono">USD {formatUsd(r.totalUsd)}</td>
-                        <td className="mono">
-                          {r.nativeCurrency === 'ARS'
-                            ? `ARS ${formatArs(r.pricePerPaxNative)}`
-                            : `USD ${formatUsd(r.pricePerPaxUsd)}`}
-                        </td>
-                        <td>{r.seatsLeft ?? 's/d'}</td>
-                        <td className="mono">
-                          {r.outboundDeparture
-                            ? new Date(r.outboundDeparture.replace(' ', 'T')).toLocaleString('es-AR', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })
-                            : 's/d'}
-                        </td>
-                      </tr>
-                    ))}
+                    .map((r, i) => {
+                      const [origin, destination] = route.split('|');
+                      const link = bookingUrl({
+                        carrier: r.carrier,
+                        origin,
+                        destination,
+                        departDate: date,
+                        paxAdults: pax,
+                      });
+                      return (
+                        <tr key={r.provider}>
+                          <td>
+                            {r.carrier ?? r.provider}
+                            {i === 0 && (
+                              <span className="pill ok" style={{ marginLeft: 8 }}>
+                                más barata
+                              </span>
+                            )}
+                          </td>
+                          <td className="mono">
+                            {r.nativeCurrency === 'ARS' ? `ARS ${formatArs(r.totalNative)}` : '—'}
+                          </td>
+                          <td className="mono">USD {formatUsd(r.totalUsd)}</td>
+                          <td className="mono">
+                            {r.nativeCurrency === 'ARS'
+                              ? `ARS ${formatArs(r.pricePerPaxNative)}`
+                              : `USD ${formatUsd(r.pricePerPaxUsd)}`}
+                          </td>
+                          <td>{r.seatsLeft ?? 's/d'}</td>
+                          <td className="mono">
+                            {r.outboundDeparture
+                              ? new Date(r.outboundDeparture.replace(' ', 'T')).toLocaleString('es-AR', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })
+                              : 's/d'}
+                          </td>
+                          <td>
+                            {link && (
+                              <a href={link} target="_blank" rel="noopener noreferrer" className="pill">
+                                reservar →
+                              </a>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>

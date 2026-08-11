@@ -3,7 +3,7 @@
 // automatiza pago ni emisión, solo se ahorra la búsqueda manual.
 //
 // Solo devolvemos link para aerolíneas cuyo formato de búsqueda confirmamos
-// a mano (hoy, Aerolíneas Argentinas). Para el resto —JetSMART, o cuando la
+// a mano (Aerolíneas Argentinas y JetSMART). Para el resto —o cuando la
 // tarifa fue simulada— preferimos no mostrar nada antes que adivinar una URL
 // que puede no existir o llevar a una página rota.
 
@@ -43,6 +43,22 @@ export function bookingUrl(p: BookingParams): string | null {
       params.append('leg', `${p.destination}-${p.origin}-${legDate(p.returnDate)}`);
     }
     return `https://www.aerolineas.com.ar/flights-offers?${params.toString()}`;
+  }
+
+  if (p.carrier === 'JetSMART') {
+    const params = new URLSearchParams({
+      c: 'true',
+      mon: 'true',
+      cur: 'ARS',
+      culture: 'es-AR',
+      dd1: p.departDate,
+      o1: p.origin,
+      d1: p.destination,
+      r: p.returnDate ? 'true' : 'false',
+      ADT: String(Math.max(1, p.paxAdults)),
+    });
+    if (p.returnDate) params.set('dd2', p.returnDate);
+    return `https://booking.jetsmart.com/Flight/InternalSelect?${params.toString()}`;
   }
 
   return null;
