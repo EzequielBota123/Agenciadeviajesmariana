@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { Countdown } from '@/components/Countdown';
 import { airportLabel } from '@/lib/agent/airports';
 import { DISCLAIMER, fareDeltaLabel } from '@/lib/agent/reply';
+import { bookingUrl } from '@/lib/booking';
 import { formatDateLong, formatStamp, isExpired } from '@/lib/dates';
 import {
   formatArs,
@@ -32,6 +33,18 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
   ]);
   const latest = snapshots[0] ?? null;
   const expired = latest ? isExpired(latest.validUntil) : false;
+  const reserveUrl = latest
+    ? bookingUrl({
+        carrier: latest.carrier,
+        origin: quote.params.origin,
+        destination: quote.params.destination,
+        departDate: quote.params.departDate,
+        returnDate: quote.params.returnDate,
+        paxAdults: quote.params.paxAdults,
+        paxChildren: quote.params.paxChildren,
+        cabin: quote.params.cabin,
+      })
+    : null;
 
   return (
     <>
@@ -90,6 +103,24 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
               <div className="fare-badge" style={{ marginTop: 18, textAlign: 'left' }}>
                 {DISCLAIMER}
               </div>
+
+              {reserveUrl && (
+                <div style={{ marginTop: 22 }}>
+                  <a
+                    className="btn block"
+                    href={reserveUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Reservar en {latest?.carrier} →
+                  </a>
+                  <p style={{ color: 'var(--muted)', fontSize: 12, marginTop: 8 }}>
+                    Te lleva al buscador oficial de la aerolínea con esta ruta y fecha ya cargadas.
+                    La compra la hacés ahí — el precio final es el que te muestre la aerolínea en
+                    ese momento.
+                  </p>
+                </div>
+              )}
             </>
           )}
         </div>

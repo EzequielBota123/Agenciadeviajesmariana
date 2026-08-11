@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { QuoteActions } from '@/components/QuoteActions';
 import { airportLabel } from '@/lib/agent/airports';
 import { fareDeltaLabel } from '@/lib/agent/reply';
+import { bookingUrl } from '@/lib/booking';
 import { formatDate, formatStamp, isExpired, timeLeft } from '@/lib/dates';
 import {
   formatArs,
@@ -29,6 +30,18 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
 
   const latest = snapshots[0] ?? null;
   const url = quoteUrl(quote.token);
+  const reserveUrl = latest
+    ? bookingUrl({
+        carrier: latest.carrier,
+        origin: quote.params.origin,
+        destination: quote.params.destination,
+        departDate: quote.params.departDate,
+        returnDate: quote.params.returnDate,
+        paxAdults: quote.params.paxAdults,
+        paxChildren: quote.params.paxChildren,
+        cabin: quote.params.cabin,
+      })
+    : null;
 
   return (
     <>
@@ -118,6 +131,17 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
                 fuente {latest.provider}
                 {latest.seatsLeft !== null ? ` · ${latest.seatsLeft} lugares` : ''}
               </p>
+              {reserveUrl && (
+                <a
+                  className="btn ghost block"
+                  style={{ marginTop: 14 }}
+                  href={reserveUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Reservar en {latest.carrier} →
+                </a>
+              )}
             </div>
           )}
 
