@@ -157,7 +157,16 @@ export function FareChecker() {
 
           <div className="field">
             <label htmlFor="date">Fecha de ida</label>
-            <input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <input
+              id="date"
+              type="date"
+              value={date}
+              onChange={(e) => {
+                const next = e.target.value;
+                setDate(next);
+                if (returnDate < next) setReturnDate(defaultReturnDate(next));
+              }}
+            />
           </div>
 
           <div className="field">
