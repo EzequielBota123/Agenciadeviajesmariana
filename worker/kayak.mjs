@@ -24,10 +24,6 @@ const USER_AGENT =
 const POLL_PATH = '/i/api/search/dynamic/flights/poll';
 const MAX_WAIT_MS = 30_000;
 
-function legPath(date) {
-  return date.replaceAll('-', '-'); // ya viene YYYY-MM-DD, Kayak lo acepta tal cual
-}
-
 async function pollUntilComplete(page, url) {
   let last = null;
 
@@ -58,8 +54,8 @@ async function pollUntilComplete(page, url) {
 
 /** Arma origen->destino->fecha en un tramo, opcionalmente con vuelta. */
 function buildUrl({ origin, destination, departDate, returnDate }) {
-  const parts = [`${origin}-${destination}`, legPath(departDate)];
-  if (returnDate) parts.push(legPath(returnDate));
+  const parts = [`${origin}-${destination}`, departDate];
+  if (returnDate) parts.push(returnDate);
   return `https://www.kayak.com.ar/flights/${parts.join('/')}?sort=price_a`;
 }
 

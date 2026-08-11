@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { AIRPORTS } from '@/lib/agent/airports';
 import { bookingUrl } from '@/lib/booking';
 import { formatArs, formatUsd, secondaryPerPaxLabel, secondaryTotalLabel } from '@/lib/money';
 import type { FareSnapshot } from '@/lib/types';
@@ -27,14 +28,7 @@ const CARRIER_LABEL: Record<string, string> = {
   kayak: 'Kayak',
 };
 
-const ROUTES = [
-  { value: 'EZE|CUN', label: 'EZE → Cancún' },
-  { value: 'AEP|BRC', label: 'AEP → Bariloche' },
-  { value: 'EZE|MIA', label: 'EZE → Miami' },
-  { value: 'EZE|MAD', label: 'EZE → Madrid' },
-  { value: 'EZE|PUJ', label: 'EZE → Punta Cana' },
-  { value: 'AEP|IGR', label: 'AEP → Iguazú' },
-];
+const AIRPORT_OPTIONS = [...AIRPORTS].sort((a, b) => a.city.localeCompare(b.city, 'es'));
 
 function defaultDate(): string {
   const d = new Date();
@@ -42,9 +36,23 @@ function defaultDate(): string {
   return d.toISOString().slice(0, 10);
 }
 
+function defaultReturnDate(depart: string): string {
+  const d = new Date(`${depart}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 7);
+  return d.toISOString().slice(0, 10);
+}
+
+function stopsLabel(stops: number | undefined): string {
+  if (stops === undefined) return 's/d';
+  return stops === 0 ? 'directo' : `${stops} escala${stops > 1 ? 's' : ''}`;
+}
+
 export function FareChecker() {
-  const [route, setRoute] = useState(ROUTES[0].value);
+  const [origin, setOrigin] = useState('EZE');
+  const [destination, setDestination] = useState('CUN');
   const [date, setDate] = useState(defaultDate);
+  const [roundTrip, setRoundTrip] = useState(false);
+  const [returnDate, setReturnDate] = useState(() => defaultReturnDate(defaultDate()));
   const [timePreference, setTimePreference] = useState('indistinto');
   const [pax, setPax] = useState(2);
   const [loading, setLoading] = useState(false);
@@ -55,8 +63,11 @@ export function FareChecker() {
   const [compareResult, setCompareResult] = useState<CompareResponse | null>(null);
   const [compareError, setCompareError] = useState<string | null>(null);
 
+  const sameAirport = origin === destination;
+  const effectiveReturnDate = roundTrip ? returnDate : null;
+
   async function check() {
-    const [origin, destination] = route.split('|');
+    if (sameAirport) return;
     setLoading(true);
     setError(null);
     setResult(null);
@@ -66,7 +77,14 @@ export function FareChecker() {
       const res = await fetch('/api/fares/check', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ origin, destination, departDate: date, pax, timePreference }),
+        body: JSON.stringify({
+          origin,
+          destination,
+          departDate: date,
+          returnDate: effectiveReturnDate,
+          pax,
+          timePreference,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'No se pudo consultar la tarifa.');
@@ -79,7 +97,7 @@ export function FareChecker() {
   }
 
   async function compare() {
-    const [origin, destination] = route.split('|');
+    if (sameAirport) return;
     setComparing(true);
     setCompareError(null);
     setCompareResult(null);
@@ -87,7 +105,13 @@ export function FareChecker() {
       const res = await fetch('/api/fares/compare', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ origin, destination, departDate: date, pax }),
+        body: JSON.stringify({
+          origin,
+          destination,
+          departDate: date,
+          returnDate: effectiveReturnDate,
+          pax,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'No se pudo comparar entre aerolíneas.');
@@ -108,20 +132,58 @@ export function FareChecker() {
       <div className="demo-grid">
         <div>
           <div className="field">
-            <label htmlFor="route">Ruta</label>
-            <select id="route" value={route} onChange={(e) => setRoute(e.target.value)}>
-              {ROUTES.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
+            <label htmlFor="origin">Origen</label>
+            <select id="origin" value={origin} onChange={(e) => setOrigin(e.target.value)}>
+              {AIRPORT_OPTIONS.map((a) => (
+                <option key={a.iata} value={a.iata}>
+                  {a.city} ({a.iata})
                 </option>
               ))}
             </select>
           </div>
 
           <div className="field">
-            <label htmlFor="date">Fecha de viaje</label>
+            <label htmlFor="destination">Destino</label>
+            <select id="destination" value={destination} onChange={(e) => setDestination(e.target.value)}>
+              {AIRPORT_OPTIONS.map((a) => (
+                <option key={a.iata} value={a.iata}>
+                  {a.city} ({a.iata})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {sameAirport && <p className="error" style={{ fontSize: 12.5 }}>Origen y destino no pueden ser el mismo.</p>}
+
+          <div className="field">
+            <label htmlFor="date">Fecha de ida</label>
             <input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
+
+          <div className="field">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={roundTrip}
+                onChange={(e) => setRoundTrip(e.target.checked)}
+                style={{ width: 'auto' }}
+              />
+              Ida y vuelta
+            </label>
+          </div>
+
+          {roundTrip && (
+            <div className="field">
+              <label htmlFor="returnDate">Fecha de vuelta</label>
+              <input
+                id="returnDate"
+                type="date"
+                value={returnDate}
+                min={date}
+                onChange={(e) => setReturnDate(e.target.value)}
+              />
+            </div>
+          )}
 
           <div className="field">
             <label htmlFor="time">Franja horaria</label>
@@ -150,14 +212,14 @@ export function FareChecker() {
             </div>
           </div>
 
-          <button className="btn block" onClick={check} disabled={loading}>
+          <button className="btn block" onClick={check} disabled={loading || sameAirport}>
             {loading ? 'Consultando disponibilidad…' : 'Consultar tarifa de hoy'}
           </button>
           <button
             className="btn ghost block"
             style={{ marginTop: 10 }}
             onClick={compare}
-            disabled={comparing}
+            disabled={comparing || sameAirport}
           >
             {comparing ? 'Comparando aerolíneas…' : 'Comparar entre aerolíneas'}
           </button>
@@ -184,7 +246,8 @@ export function FareChecker() {
           {!loading && snapshot && result && (
             <div className="fare-out">
               <div className="fare-route">
-                {snapshot.origin} → {snapshot.destination} · {snapshot.departDate} · {snapshot.pax} pax
+                {snapshot.origin} → {snapshot.destination} · {snapshot.departDate}
+                {snapshot.returnDate ? ` → ${snapshot.returnDate}` : ' (solo ida)'} · {snapshot.pax} pax
               </div>
               <div className="fare-amount">
                 <span className="cur">{snapshot.nativeCurrency}</span>
@@ -268,6 +331,7 @@ export function FareChecker() {
                     <th>Total ARS</th>
                     <th>≈ Total USD</th>
                     <th>Por pasajero</th>
+                    <th>Escalas</th>
                     <th>Asientos</th>
                     <th>Salida</th>
                     <th></th>
@@ -277,19 +341,17 @@ export function FareChecker() {
                   {[...compareResult.results]
                     .sort((a, b) => a.totalUsd - b.totalUsd)
                     .map((r, i) => {
-                      const [origin, destination] = route.split('|');
                       const viaKayak = r.provider === 'kayak';
-                      const kayakUrl =
-                        viaKayak && r.raw && typeof r.raw === 'object' && 'kayakBookingUrl' in r.raw
-                          ? ((r.raw as { kayakBookingUrl?: string | null }).kayakBookingUrl ?? null)
-                          : null;
+                      const rawInfo =
+                        r.raw && typeof r.raw === 'object' ? (r.raw as { kayakBookingUrl?: string | null; stops?: number }) : null;
                       const link =
-                        kayakUrl ??
+                        (viaKayak ? (rawInfo?.kayakBookingUrl ?? null) : null) ??
                         bookingUrl({
                           carrier: r.carrier,
                           origin,
                           destination,
                           departDate: date,
+                          returnDate: effectiveReturnDate,
                           paxAdults: pax,
                         });
                       return (
@@ -316,6 +378,7 @@ export function FareChecker() {
                               ? `ARS ${formatArs(r.pricePerPaxNative)}`
                               : `USD ${formatUsd(r.pricePerPaxUsd)}`}
                           </td>
+                          <td>{stopsLabel(rawInfo?.stops)}</td>
                           <td>{r.seatsLeft ?? 's/d'}</td>
                           <td className="mono">
                             {r.outboundDeparture
