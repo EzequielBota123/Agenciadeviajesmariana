@@ -76,6 +76,9 @@ export function FareChecker() {
   const [compareResult, setCompareResult] = useState<CompareResponse | null>(null);
   const [compareError, setCompareError] = useState<string | null>(null);
   const [progress, setProgress] = useState<Record<string, ProgressStatus>>({});
+  const [sortBy, setSortBy] = useState<'price' | 'stops'>('price');
+  const [directOnly, setDirectOnly] = useState(false);
+  const [carrierFilter, setCarrierFilter] = useState('all');
 
   const sameAirport = origin === destination;
   const effectiveReturnDate = roundTrip ? returnDate : null;
@@ -285,7 +288,14 @@ export function FareChecker() {
         </div>
 
         <div className="result">
-          {loading && <span className="loading-dots">buscando tarifa en la aerolínea</span>}
+          {loading && (
+            <div className="fare-out" aria-busy="true" aria-label="Buscando tarifa">
+              <div className="skeleton skeleton-line w40" />
+              <div className="skeleton skeleton-line w60" style={{ height: 34, margin: '10px 0' }} />
+              <div className="skeleton skeleton-line w30" />
+              <div className="skeleton skeleton-line w40" style={{ marginTop: 18 }} />
+            </div>
+          )}
 
           {!loading && error && (
             <p className="error">
@@ -364,16 +374,19 @@ export function FareChecker() {
       </div>
 
       {comparing && (
-        <div style={{ marginTop: 24 }} className="fare-sub">
+        <div style={{ marginTop: 24 }} className="provider-progress">
           {CARRIER_KEYS.map((c) => {
             const status = progress[c] ?? 'pending';
             return (
-              <div key={c} style={{ padding: '3px 0' }}>
-                {status === 'pending' && '⏳ consultando '}
-                {status === 'ok' && '✓ '}
-                {status === 'error' && '✕ '}
-                {CARRIER_LABEL[c] ?? c}
-                {status === 'pending' ? '…' : status === 'error' ? ' — sin respuesta' : ''}
+              <div key={c} className={`provider-progress-row ${status}`}>
+                {status === 'pending' && <span className="spinner" />}
+                {status === 'ok' && <span className="status-icon">✓</span>}
+                {status === 'error' && <span className="status-icon">✕</span>}
+                <span>
+                  {CARRIER_LABEL[c] ?? c}
+                  {status === 'pending' && ' — consultando…'}
+                  {status === 'error' && ' — sin respuesta'}
+                </span>
               </div>
             );
           })}
@@ -393,86 +406,147 @@ export function FareChecker() {
           {compareResult.results.length === 0 ? (
             <p className="fare-sub">Ninguna aerolínea devolvió tarifa para esta búsqueda.</p>
           ) : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Aerolínea</th>
-                    <th>Total ARS</th>
-                    <th>≈ Total USD</th>
-                    <th>Por pasajero</th>
-                    <th>Escalas</th>
-                    <th>Asientos</th>
-                    <th>Salida</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...compareResult.results]
-                    .sort((a, b) => a.totalUsd - b.totalUsd)
-                    .map((r, i) => {
-                      const viaKayak = r.provider === 'kayak';
-                      const rawInfo =
-                        r.raw && typeof r.raw === 'object' ? (r.raw as { kayakBookingUrl?: string | null; stops?: number }) : null;
-                      const link =
-                        (viaKayak ? (rawInfo?.kayakBookingUrl ?? null) : null) ??
-                        bookingUrl({
-                          carrier: r.carrier,
-                          origin,
-                          destination,
-                          departDate: date,
-                          returnDate: effectiveReturnDate,
-                          paxAdults: pax,
-                        });
-                      return (
-                        <tr key={`${r.provider}-${r.carrier}-${i}`}>
-                          <td>
-                            {r.carrier ?? r.provider}
-                            {i === 0 && (
-                              <span className="pill ok" style={{ marginLeft: 8 }}>
-                                más barata
-                              </span>
-                            )}
-                            {viaKayak && (
-                              <span className="pill" style={{ marginLeft: 8 }} title="Precio de un revendedor visto en Kayak, no el precio directo de la aerolínea">
-                                vía Kayak
-                              </span>
-                            )}
-                          </td>
-                          <td className="mono">
-                            {r.nativeCurrency === 'ARS' ? `ARS ${formatArs(r.totalNative)}` : '—'}
-                          </td>
-                          <td className="mono">USD {formatUsd(r.totalUsd)}</td>
-                          <td className="mono">
-                            {r.nativeCurrency === 'ARS'
-                              ? `ARS ${formatArs(r.pricePerPaxNative)}`
-                              : `USD ${formatUsd(r.pricePerPaxUsd)}`}
-                          </td>
-                          <td>{stopsLabel(rawInfo?.stops)}</td>
-                          <td>{r.seatsLeft ?? 's/d'}</td>
-                          <td className="mono">
-                            {r.outboundDeparture
-                              ? new Date(r.outboundDeparture.replace(' ', 'T')).toLocaleString('es-AR', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })
-                              : 's/d'}
-                          </td>
-                          <td>
-                            {link && (
-                              <a href={link} target="_blank" rel="noopener noreferrer" className="pill">
-                                {viaKayak ? 'ver oferta →' : 'reservar →'}
-                              </a>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
-            </div>
+            (() => {
+              const rankedByPrice = [...compareResult.results].sort((a, b) => a.totalUsd - b.totalUsd);
+              const cheapestKey = `${rankedByPrice[0].provider}-${rankedByPrice[0].carrier}`;
+              const carrierOptions = [...new Set(compareResult.results.map((r) => r.carrier ?? r.provider))].sort(
+                (a, b) => a.localeCompare(b, 'es'),
+              );
+
+              const rawStops = (r: FareResult): number | undefined =>
+                r.raw && typeof r.raw === 'object' ? (r.raw as { stops?: number }).stops : undefined;
+
+              const filtered = rankedByPrice.filter((r) => {
+                if (directOnly && (rawStops(r) ?? 1) !== 0) return false;
+                if (carrierFilter !== 'all' && (r.carrier ?? r.provider) !== carrierFilter) return false;
+                return true;
+              });
+
+              const shown =
+                sortBy === 'stops'
+                  ? [...filtered].sort((a, b) => (rawStops(a) ?? 99) - (rawStops(b) ?? 99))
+                  : filtered;
+
+              return (
+                <>
+                  <div className="compare-toolbar">
+                    <label>
+                      Ordenar por
+                      <select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'price' | 'stops')}>
+                        <option value="price">Precio</option>
+                        <option value="stops">Escalas</option>
+                      </select>
+                    </label>
+                    <label>
+                      Aerolínea
+                      <select value={carrierFilter} onChange={(e) => setCarrierFilter(e.target.value)}>
+                        <option value="all">Todas</option>
+                        {carrierOptions.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="check">
+                      Solo vuelos directos
+                      <input type="checkbox" checked={directOnly} onChange={(e) => setDirectOnly(e.target.checked)} />
+                    </label>
+                  </div>
+
+                  {shown.length === 0 ? (
+                    <p className="fare-sub">Ningún resultado coincide con ese filtro.</p>
+                  ) : (
+                    <div className="table-wrap compare-table-wrap">
+                      <table className="compare-table">
+                        <thead>
+                          <tr>
+                            <th>Aerolínea</th>
+                            <th>Total ARS</th>
+                            <th>≈ Total USD</th>
+                            <th>Por pasajero</th>
+                            <th>Escalas</th>
+                            <th>Asientos</th>
+                            <th>Salida</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {shown.map((r, i) => {
+                            const viaKayak = r.provider === 'kayak';
+                            const rawInfo =
+                              r.raw && typeof r.raw === 'object'
+                                ? (r.raw as { kayakBookingUrl?: string | null; stops?: number })
+                                : null;
+                            const link =
+                              (viaKayak ? (rawInfo?.kayakBookingUrl ?? null) : null) ??
+                              bookingUrl({
+                                carrier: r.carrier,
+                                origin,
+                                destination,
+                                departDate: date,
+                                returnDate: effectiveReturnDate,
+                                paxAdults: pax,
+                              });
+                            return (
+                              <tr key={`${r.provider}-${r.carrier}-${i}`}>
+                                <td data-label="Aerolínea">
+                                  {r.carrier ?? r.provider}
+                                  {`${r.provider}-${r.carrier}` === cheapestKey && (
+                                    <span className="pill ok" style={{ marginLeft: 8 }}>
+                                      más barata
+                                    </span>
+                                  )}
+                                  {viaKayak && (
+                                    <span
+                                      className="pill"
+                                      style={{ marginLeft: 8 }}
+                                      title="Precio de un revendedor visto en Kayak, no el precio directo de la aerolínea"
+                                    >
+                                      vía Kayak
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="mono" data-label="Total ARS">
+                                  {r.nativeCurrency === 'ARS' ? `ARS ${formatArs(r.totalNative)}` : '—'}
+                                </td>
+                                <td className="mono" data-label="≈ Total USD">
+                                  USD {formatUsd(r.totalUsd)}
+                                </td>
+                                <td className="mono" data-label="Por pasajero">
+                                  {r.nativeCurrency === 'ARS'
+                                    ? `ARS ${formatArs(r.pricePerPaxNative)}`
+                                    : `USD ${formatUsd(r.pricePerPaxUsd)}`}
+                                </td>
+                                <td data-label="Escalas">{stopsLabel(rawInfo?.stops)}</td>
+                                <td data-label="Asientos">{r.seatsLeft ?? 's/d'}</td>
+                                <td className="mono" data-label="Salida">
+                                  {r.outboundDeparture
+                                    ? new Date(r.outboundDeparture.replace(' ', 'T')).toLocaleString('es-AR', {
+                                        day: '2-digit',
+                                        month: '2-digit',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })
+                                    : 's/d'}
+                                </td>
+                                <td>
+                                  {link && (
+                                    <a href={link} target="_blank" rel="noopener noreferrer" className="pill">
+                                      {viaKayak ? 'ver oferta →' : 'reservar →'}
+                                    </a>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              );
+            })()
           )}
 
           {compareResult.results.some((r) => r.provider === 'kayak') && (

@@ -618,6 +618,187 @@ h3 {
   }
 }
 
+/* ---------- SKELETON LOADERS ---------- */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgba(124, 140, 166, 0.14);
+  border-radius: 6px;
+  color: transparent !important;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(124, 140, 166, 0.22),
+    transparent
+  );
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.skeleton-line {
+  height: 13px;
+  margin: 6px 0;
+}
+.skeleton-line.w60 {
+  width: 60%;
+}
+.skeleton-line.w40 {
+  width: 40%;
+}
+.skeleton-line.w30 {
+  width: 30%;
+}
+
+/* ---------- PROGRESO DE BÚSQUEDA (proveedores) ---------- */
+.provider-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.provider-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(20, 42, 63, 0.35);
+  font-size: 13px;
+}
+.provider-progress-row .spinner {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid rgba(232, 163, 61, 0.25);
+  border-top-color: var(--amber);
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.provider-progress-row .status-icon {
+  width: 13px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.provider-progress-row.ok {
+  color: var(--green);
+  border-color: rgba(79, 216, 138, 0.3);
+}
+.provider-progress-row.error {
+  color: var(--red);
+  border-color: rgba(240, 104, 95, 0.3);
+}
+.provider-progress-row.pending {
+  color: var(--muted);
+}
+
+/* ---------- TABLA COMPARATIVA (orden/filtros + cards en mobile) ---------- */
+.compare-toolbar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.compare-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+.compare-toolbar select {
+  background: #0d1c2c;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-family: var(--sans);
+  font-size: 13px;
+}
+.compare-toolbar .check {
+  flex-direction: row-reverse;
+  cursor: pointer;
+}
+.compare-toolbar .check input {
+  width: auto;
+}
+
+@media (max-width: 640px) {
+  .compare-table-wrap {
+    border: none;
+    background: none;
+    overflow: visible;
+  }
+  .compare-table {
+    min-width: 0;
+  }
+  .compare-table thead {
+    display: none;
+  }
+  .compare-table,
+  .compare-table tbody,
+  .compare-table tr,
+  .compare-table td {
+    display: block;
+    width: 100%;
+  }
+  .compare-table tr {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    margin-bottom: 12px;
+    padding: 12px 14px;
+    background: var(--navy);
+  }
+  .compare-table td {
+    border-bottom: none;
+    padding: 5px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .compare-table td::before {
+    content: attr(data-label);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .compare-table td:first-child {
+    font-size: 15px;
+    font-weight: 600;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(36, 66, 94, 0.5);
+    margin-bottom: 6px;
+  }
+  .compare-table td:first-child::before {
+    content: none;
+  }
+  .compare-table td:last-child {
+    padding-top: 10px;
+  }
+}
+
 .fare-out {
   width: 100%;
   animation: fadeUp 0.35s ease;
