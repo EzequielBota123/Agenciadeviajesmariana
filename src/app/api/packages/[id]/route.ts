@@ -37,6 +37,16 @@ export async function PATCH(req: Request, ctx: Ctx) {
   return Response.json({ package: updated });
 }
 
+export async function DELETE(req: Request, ctx: Ctx) {
+  if (!isAuthorizedRequest(req)) return unauthorized();
+  const { id } = await ctx.params;
+
+  const deleted = await store().deletePackage(id);
+  if (!deleted) return Response.json({ error: 'Paquete no encontrado.' }, { status: 404 });
+
+  return Response.json({ ok: true });
+}
+
 /** Fuerza un chequeo de tarifa para este paquete, sin esperar al cron. */
 export async function POST(req: Request, ctx: Ctx) {
   if (!isAuthorizedRequest(req)) return unauthorized();

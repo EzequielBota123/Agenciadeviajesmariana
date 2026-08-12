@@ -56,6 +56,7 @@ export interface Store {
   getPackage(idOrSlug: string): Promise<TravelPackage | null>;
   createPackage(input: PackageInput): Promise<TravelPackage>;
   updatePackage(id: string, patch: Partial<PackageInput>): Promise<TravelPackage | null>;
+  deletePackage(id: string): Promise<boolean>;
 
   listQuotes(opts?: { limit?: number }): Promise<Quote[]>;
   getQuote(id: string): Promise<Quote | null>;
@@ -302,6 +303,18 @@ class MemoryStore implements Store {
     const merged = normalizePackage({ ...state.packages[i], ...patch } as PackageInput, state.packages[i]);
     state.packages[i] = merged;
     return merged;
+  }
+
+  async deletePackage(id: string): Promise<boolean> {
+    const state = memoryState();
+    const i = state.packages.findIndex((p) => p.id === id);
+    if (i === -1) return false;
+    state.packages.splice(i, 1);
+    state.snapshots = state.snapshots.filter((s) => s.packageId !== id);
+    for (const q of state.quotes) {
+      if (q.packageId === id) q.packageId = null;
+    }
+    return true;
   }
 
   async listQuotes(opts?: { limit?: number }): Promise<Quote[]> {
@@ -557,6 +570,11 @@ class PostgresStore implements Store {
       where id = ${p.id}
     `;
     return p;
+  }
+
+  async deletePackage(id: string): Promise<boolean> {
+    const rows = await this.sql`delete from packages where id = ${id} returning id`;
+    return rows.length > 0;
   }
 
   async listQuotes(opts?: { limit?: number }): Promise<Quote[]> {

@@ -1,3 +1,4 @@
+import { DeletePackageButton } from '@/components/DeletePackageButton';
 import { DeleteQuoteButton } from '@/components/DeleteQuoteButton';
 import { RefreshPackageButton } from '@/components/RefreshPackageButton';
 import { agentEngine } from '@/lib/agent/parse';
@@ -195,7 +196,10 @@ export default async function AdminPage() {
                         </span>
                       </td>
                       <td>
-                        <RefreshPackageButton packageId={pkg.id} />
+                        <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+                          <RefreshPackageButton packageId={pkg.id} />
+                          <DeletePackageButton packageId={pkg.id} />
+                        </div>
                       </td>
                     </tr>
                   );
