@@ -56,3 +56,13 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
   return Response.json({ quote: updated });
 }
+
+export async function DELETE(req: Request, ctx: Ctx) {
+  if (!isAuthorizedRequest(req)) return unauthorized();
+  const { id } = await ctx.params;
+
+  const deleted = await store().deleteQuote(id);
+  if (!deleted) return Response.json({ error: 'Consulta no encontrada.' }, { status: 404 });
+
+  return Response.json({ ok: true });
+}

@@ -22,11 +22,24 @@ interface CompareResponse {
   errors: Array<{ carrier: string; message: string }>;
 }
 
+interface CompareStreamEvent {
+  type: 'carrier' | 'done';
+  carrier?: string;
+  ok?: boolean;
+  result?: FareResult;
+  results?: FareResult[];
+  error?: string;
+}
+
+type ProgressStatus = 'pending' | 'ok' | 'error';
+
 const CARRIER_LABEL: Record<string, string> = {
   aerolineas: 'Aerolíneas Argentinas',
   jetsmart: 'JetSMART',
-  kayak: 'Kayak',
+  kayak: 'Kayak (LATAM, Avianca, Copa y otras)',
 };
+
+const CARRIER_KEYS = ['jetsmart', 'aerolineas', 'kayak'];
 
 const AIRPORT_OPTIONS = [...AIRPORTS].sort((a, b) => a.city.localeCompare(b.city, 'es'));
 
@@ -62,6 +75,7 @@ export function FareChecker() {
   const [comparing, setComparing] = useState(false);
   const [compareResult, setCompareResult] = useState<CompareResponse | null>(null);
   const [compareError, setCompareError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<Record<string, ProgressStatus>>({});
 
   const sameAirport = origin === destination;
   const effectiveReturnDate = roundTrip ? returnDate : null;
@@ -100,7 +114,8 @@ export function FareChecker() {
     if (sameAirport) return;
     setComparing(true);
     setCompareError(null);
-    setCompareResult(null);
+    setCompareResult({ results: [], errors: [] });
+    setProgress(Object.fromEntries(CARRIER_KEYS.map((c) => [c, 'pending' as ProgressStatus])));
     try {
       const res = await fetch('/api/fares/compare', {
         method: 'POST',
@@ -113,9 +128,44 @@ export function FareChecker() {
           pax,
         }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? 'No se pudo comparar entre aerolíneas.');
-      setCompareResult(json as CompareResponse);
+
+      if (!res.ok || !res.body) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? 'No se pudo comparar entre aerolíneas.');
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const chunks = buffer.split('\n\n');
+        buffer = chunks.pop() ?? '';
+        for (const chunk of chunks) {
+          const line = chunk.trim();
+          if (!line.startsWith('data:')) continue;
+          const event = JSON.parse(line.slice(5).trim()) as CompareStreamEvent;
+          if (event.type !== 'carrier' || !event.carrier) continue;
+
+          setProgress((prev) => ({ ...prev, [event.carrier as string]: event.ok ? 'ok' : 'error' }));
+
+          if (event.ok) {
+            const newResults = event.carrier === 'kayak' ? (event.results ?? []) : event.result ? [event.result] : [];
+            setCompareResult((prev) => ({
+              results: [...(prev?.results ?? []), ...newResults],
+              errors: prev?.errors ?? [],
+            }));
+          } else {
+            setCompareResult((prev) => ({
+              results: prev?.results ?? [],
+              errors: [...(prev?.errors ?? []), { carrier: event.carrier as string, message: event.error ?? 'falló' }],
+            }));
+          }
+        }
+      }
     } catch (err) {
       setCompareError(err instanceof Error ? err.message : 'Error inesperado.');
     } finally {
@@ -221,16 +271,16 @@ export function FareChecker() {
             </div>
           </div>
 
-          <button className="btn block" onClick={check} disabled={loading || sameAirport}>
-            {loading ? 'Consultando disponibilidad…' : 'Consultar tarifa de hoy'}
+          <button className="btn block" onClick={compare} disabled={comparing || sameAirport}>
+            {comparing ? 'Buscando…' : 'Buscar vuelo'}
           </button>
           <button
             className="btn ghost block"
             style={{ marginTop: 10 }}
-            onClick={compare}
-            disabled={comparing || sameAirport}
+            onClick={check}
+            disabled={loading || sameAirport}
           >
-            {comparing ? 'Comparando aerolíneas…' : 'Comparar entre aerolíneas'}
+            {loading ? 'Consultando…' : 'Ver solo tarifa oficial de Aerolíneas'}
           </button>
         </div>
 
@@ -314,9 +364,20 @@ export function FareChecker() {
       </div>
 
       {comparing && (
-        <p className="loading-dots" style={{ marginTop: 24, display: 'block' }}>
-          consultando todas las aerolíneas en paralelo
-        </p>
+        <div style={{ marginTop: 24 }} className="fare-sub">
+          {CARRIER_KEYS.map((c) => {
+            const status = progress[c] ?? 'pending';
+            return (
+              <div key={c} style={{ padding: '3px 0' }}>
+                {status === 'pending' && '⏳ consultando '}
+                {status === 'ok' && '✓ '}
+                {status === 'error' && '✕ '}
+                {CARRIER_LABEL[c] ?? c}
+                {status === 'pending' ? '…' : status === 'error' ? ' — sin respuesta' : ''}
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {!comparing && compareError && (
@@ -327,7 +388,7 @@ export function FareChecker() {
         </p>
       )}
 
-      {!comparing && compareResult && (
+      {compareResult && (compareResult.results.length > 0 || !comparing) && (
         <div style={{ marginTop: 24 }}>
           {compareResult.results.length === 0 ? (
             <p className="fare-sub">Ninguna aerolínea devolvió tarifa para esta búsqueda.</p>

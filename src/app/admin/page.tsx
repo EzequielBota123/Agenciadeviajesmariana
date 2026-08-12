@@ -1,3 +1,4 @@
+import { DeleteQuoteButton } from '@/components/DeleteQuoteButton';
 import { RefreshPackageButton } from '@/components/RefreshPackageButton';
 import { agentEngine } from '@/lib/agent/parse';
 import { airportLabel } from '@/lib/agent/airports';
@@ -278,13 +279,16 @@ export default async function AdminPage() {
                       <StatusPill status={quote.status} />
                     </td>
                     <td>
-                      <a
-                        className="btn ghost"
-                        style={{ fontSize: 12, padding: '6px 10px' }}
-                        href={`/admin/cotizaciones/${quote.id}`}
-                      >
-                        Abrir
-                      </a>
+                      <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+                        <a
+                          className="btn ghost"
+                          style={{ fontSize: 12, padding: '6px 10px' }}
+                          href={`/admin/cotizaciones/${quote.id}`}
+                        >
+                          Abrir
+                        </a>
+                        <DeleteQuoteButton quoteId={quote.id} />
+                      </div>
                     </td>
                   </tr>
                 ))}

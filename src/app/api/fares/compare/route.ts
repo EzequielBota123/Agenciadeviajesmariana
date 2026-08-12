@@ -17,18 +17,28 @@ interface Body {
   cabin?: string;
 }
 
-interface CompareResponse {
-  results: FareResult[];
-  errors: Array<{ carrier: string; message: string }>;
+export interface CompareStreamEvent {
+  type: 'carrier' | 'done';
+  carrier?: string;
+  ok?: boolean;
+  result?: FareResult;
+  results?: FareResult[];
+  error?: string;
+  ms?: number;
 }
 
 /**
  * Compara la tarifa del día entre todas las aerolíneas que el worker sabe
  * consultar. A diferencia de `/api/fares/check`, esto no pasa por el
  * `FareProvider` de la app (que resuelve un único proveedor) — le pega
- * directo al endpoint `/compare` del worker, que ya corre todo en paralelo.
- * Si no hay worker configurado, no hay con qué comparar: no existe un modo
- * "simulado" para esto porque no tendría sentido comparar contra sí mismo.
+ * directo al endpoint `/compare` del worker. Si no hay worker configurado,
+ * no hay con qué comparar: no existe un modo "simulado" para esto porque no
+ * tendría sentido comparar contra sí mismo.
+ *
+ * El worker devuelve Server-Sent Events (uno por proveedor a medida que
+ * termina) en vez de un único JSON al final — acá lo re-transmitimos tal
+ * cual, byte a byte, para que el cliente vea el progreso en tiempo real en
+ * lugar de esperar a que el proveedor más lento (Kayak) termine.
  */
 export async function POST(req: Request) {
   const workerUrl = process.env.FARE_WORKER_URL ?? '';
@@ -74,10 +84,11 @@ export async function POST(req: Request) {
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 100_000);
+  const timeout = setTimeout(() => controller.abort(), 105_000);
 
+  let res: Response;
   try {
-    const res = await fetch(`${workerUrl.replace(/\/$/, '')}/compare`, {
+    res = await fetch(`${workerUrl.replace(/\/$/, '')}/compare`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -94,21 +105,43 @@ export async function POST(req: Request) {
       signal: controller.signal,
       cache: 'no-store',
     });
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      return Response.json({ error: `El worker respondió ${res.status}: ${text.slice(0, 300)}` }, { status: 502 });
-    }
-
-    const data = (await res.json()) as CompareResponse;
-    return Response.json(data);
   } catch (err) {
+    clearTimeout(timeout);
     const message =
       err instanceof Error && err.name === 'AbortError'
-        ? 'El worker no respondió en 100 s.'
+        ? 'El worker no respondió a tiempo.'
         : `No se pudo contactar al worker: ${String(err)}`;
     return Response.json({ error: message }, { status: 502 });
-  } finally {
-    clearTimeout(timeout);
   }
+
+  if (!res.ok || !res.body) {
+    clearTimeout(timeout);
+    const text = await res.text().catch(() => '');
+    return Response.json({ error: `El worker respondió ${res.status}: ${text.slice(0, 300)}` }, { status: 502 });
+  }
+
+  const reader = res.body.getReader();
+  const stream = new ReadableStream<Uint8Array>({
+    async pull(streamController) {
+      const { done, value } = await reader.read();
+      if (done) {
+        clearTimeout(timeout);
+        streamController.close();
+        return;
+      }
+      streamController.enqueue(value);
+    },
+    cancel(reason) {
+      clearTimeout(timeout);
+      reader.cancel(reason).catch(() => {});
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+    },
+  });
 }

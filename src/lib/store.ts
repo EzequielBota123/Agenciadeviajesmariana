@@ -66,6 +66,7 @@ export interface Store {
     patch: { params?: QuoteParams; status?: QuoteStatus; customerName?: string | null; customerContact?: string | null },
     opts?: { bumpRevision?: boolean },
   ): Promise<Quote | null>;
+  deleteQuote(id: string): Promise<boolean>;
 
   listEvents(quoteId: string): Promise<QuoteEvent[]>;
   addEvent(input: EventInput): Promise<QuoteEvent>;
@@ -358,6 +359,16 @@ class MemoryStore implements Store {
     return state.quotes[i];
   }
 
+  async deleteQuote(id: string): Promise<boolean> {
+    const state = memoryState();
+    const i = state.quotes.findIndex((q) => q.id === id);
+    if (i === -1) return false;
+    state.quotes.splice(i, 1);
+    state.events = state.events.filter((e) => e.quoteId !== id);
+    state.snapshots = state.snapshots.filter((s) => s.quoteId !== id);
+    return true;
+  }
+
   async listEvents(quoteId: string): Promise<QuoteEvent[]> {
     return memoryState()
       .events.filter((e) => e.quoteId === quoteId)
@@ -621,6 +632,11 @@ class PostgresStore implements Store {
       where id = ${next.id}
     `;
     return next;
+  }
+
+  async deleteQuote(id: string): Promise<boolean> {
+    const rows = await this.sql`delete from quotes where id = ${id} returning id`;
+    return rows.length > 0;
   }
 
   async listEvents(quoteId: string): Promise<QuoteEvent[]> {

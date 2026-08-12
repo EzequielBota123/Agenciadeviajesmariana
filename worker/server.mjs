@@ -100,6 +100,12 @@ const DIRECT_CARRIER_NAMES = new Set(Object.values(CARRIERS).map((c) => normaliz
  * descartamos: el precio directo es más confiable y no tiene sentido mostrar
  * dos números distintos para la misma compañía en la misma tabla.
  */
+// Streamea un evento por proveedor a medida que va resolviendo (Server-Sent
+// Events), en vez de hacer esperar al cliente hasta que TODOS terminen. Como
+// Aerolíneas/JetSMART van en paralelo entre sí pero Kayak va después (ver
+// comentario arriba sobre CPU/RAM del plan free de Render), el cliente ve
+// JetSMART casi al toque, Aerolíneas un poco después y Kayak al final — en
+// vez de mirar una pantalla en blanco todo ese tiempo.
 app.post('/compare', async (req, res) => {
   if (!isAuthorized(req)) {
     res.status(401).json({ error: 'Falta o es inválido el Authorization: Bearer <token>.' });
@@ -112,39 +118,48 @@ app.post('/compare', async (req, res) => {
     return;
   }
 
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+  const send = (event) => res.write(`data: ${JSON.stringify(event)}\n\n`);
+
   const started = Date.now();
-  const directEntries = await Promise.all(
+  let okCount = 0;
+  let errCount = 0;
+
+  await Promise.all(
     Object.entries(CARRIERS).map(async ([key, carrier]) => {
       try {
         const result = await carrier.search(query);
-        return { carrier: key, ok: true, result };
+        okCount += 1;
+        send({ type: 'carrier', carrier: key, ok: true, result });
       } catch (err) {
-        return { carrier: key, ok: false, error: err instanceof Error ? err.message : String(err) };
+        errCount += 1;
+        send({ type: 'carrier', carrier: key, ok: false, error: err instanceof Error ? err.message : String(err) });
       }
     }),
   );
-  const kayakEntry = await searchKayakFares(query).then(
-    (results) => ({ carrier: 'kayak', ok: true, results }),
-    (err) => ({ carrier: 'kayak', ok: false, error: err instanceof Error ? err.message : String(err) }),
-  );
 
-  const results = directEntries.filter((e) => e.ok).map((e) => e.result);
-  const errors = directEntries.filter((e) => !e.ok).map((e) => ({ carrier: e.carrier, message: e.error }));
-
-  if (kayakEntry.ok) {
-    for (const r of kayakEntry.results) {
-      if (!DIRECT_CARRIER_NAMES.has(normalizeName(r.carrier ?? ''))) results.push(r);
-    }
-  } else {
-    errors.push({ carrier: 'kayak', message: kayakEntry.error });
+  try {
+    const kayakResults = await searchKayakFares(query);
+    const filtered = kayakResults.filter((r) => !DIRECT_CARRIER_NAMES.has(normalizeName(r.carrier ?? '')));
+    okCount += filtered.length > 0 ? 1 : 0;
+    send({ type: 'carrier', carrier: 'kayak', ok: true, results: filtered });
+  } catch (err) {
+    errCount += 1;
+    send({ type: 'carrier', carrier: 'kayak', ok: false, error: err instanceof Error ? err.message : String(err) });
   }
 
   console.log(
     `[worker] /compare ${query.origin}-${query.destination} ${query.departDate} x${query.pax} -> ` +
-      `${results.length} ok, ${errors.length} error(es) en ${Date.now() - started}ms`,
+      `${okCount} ok, ${errCount} error(es) en ${Date.now() - started}ms`,
   );
 
-  res.json({ results, errors });
+  send({ type: 'done', ms: Date.now() - started });
+  res.end();
 });
 
 const server = app.listen(PORT, () => {
