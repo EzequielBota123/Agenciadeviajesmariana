@@ -49,6 +49,7 @@ export default async function HomePage() {
           <div className="navlinks">
             <a href="#problema">El problema</a>
             <a href="#solucion">La solución</a>
+            <a href="/explorar">Explorar destinos</a>
             <a href="#demo">Demo</a>
             <a href="/admin" className="cta">
               Panel

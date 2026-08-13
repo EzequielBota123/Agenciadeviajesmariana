@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/refresh-fares",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/explore-fares",
+      "schedule": "0 6 * * *"
     }
   ]
 }

@@ -1,4 +1,5 @@
 import { db, hasDatabase } from './db';
+import { EXPLORE_TAG } from './explore';
 import { newId, newToken, slugify } from './ids';
 import { addDays, arToday } from './dates';
 import {
@@ -83,6 +84,8 @@ export interface Store {
     provider?: string;
   }): Promise<FareSnapshot | null>;
   listSnapshots(opts: { quoteId?: string; packageId?: string; limit?: number }): Promise<FareSnapshot[]>;
+  /** Últimos precios precalculados por el cron de "Explorar destinos", uno por destino. */
+  latestExploreFares(origin: string): Promise<FareSnapshot[]>;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -442,6 +445,17 @@ class MemoryStore implements Store {
       .sort((a, b) => b.fetchedAt.localeCompare(a.fetchedAt))
       .slice(0, opts.limit ?? 50);
   }
+
+  async latestExploreFares(origin: string): Promise<FareSnapshot[]> {
+    const isExplore = (s: FareSnapshot) =>
+      s.raw !== null && typeof s.raw === 'object' && (s.raw as Record<string, unknown>)[EXPLORE_TAG] === true;
+    const byDestination = new Map<string, FareSnapshot>();
+    for (const s of [...memoryState().snapshots].sort((a, b) => b.fetchedAt.localeCompare(a.fetchedAt))) {
+      if (s.origin !== origin || s.quoteId !== null || s.packageId !== null || !isExplore(s)) continue;
+      if (!byDestination.has(s.destination)) byDestination.set(s.destination, s);
+    }
+    return [...byDestination.values()];
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -765,6 +779,19 @@ class PostgresStore implements Store {
     }
     const rows = await this.sql`
       select * from fare_snapshots order by fetched_at desc limit ${limit}
+    `;
+    return rows.map(rowToSnapshot);
+  }
+
+  async latestExploreFares(origin: string): Promise<FareSnapshot[]> {
+    const rows = await this.sql`
+      select distinct on (destination) *
+      from fare_snapshots
+      where origin = ${origin}
+        and quote_id is null
+        and package_id is null
+        and raw ->> ${EXPLORE_TAG} = 'true'
+      order by destination, fetched_at desc
     `;
     return rows.map(rowToSnapshot);
   }
