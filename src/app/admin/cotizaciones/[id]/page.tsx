@@ -1,16 +1,10 @@
 import { notFound } from 'next/navigation';
+import { FareCompareTable } from '@/components/FareCompareTable';
 import { QuoteActions } from '@/components/QuoteActions';
 import { airportLabel } from '@/lib/agent/airports';
 import { fareDeltaLabel } from '@/lib/agent/reply';
-import { bookingUrl } from '@/lib/booking';
 import { formatDate, formatStamp, isExpired, timeLeft } from '@/lib/dates';
-import {
-  formatArs,
-  formatUsd,
-  primaryPerPaxLabel,
-  secondaryPerPaxLabel,
-  secondaryTotalLabel,
-} from '@/lib/money';
+import { formatArs, formatUsd } from '@/lib/money';
 import { store } from '@/lib/store';
 import { quoteUrl } from '@/lib/urls';
 import { totalPax } from '@/lib/types';
@@ -24,24 +18,26 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
 
   const [events, snapshots, pkg] = await Promise.all([
     store().listEvents(quote.id),
-    store().listSnapshots({ quoteId: quote.id, limit: 20 }),
+    store().listSnapshots({ quoteId: quote.id, limit: 60 }),
     quote.packageId ? store().getPackage(quote.packageId) : Promise.resolve(null),
   ]);
 
   const latest = snapshots[0] ?? null;
   const url = quoteUrl(quote.token);
-  const reserveUrl = latest
-    ? bookingUrl({
-        carrier: latest.carrier,
-        origin: quote.params.origin,
-        destination: quote.params.destination,
-        departDate: quote.params.departDate,
-        returnDate: quote.params.returnDate,
-        paxAdults: quote.params.paxAdults,
-        paxChildren: quote.params.paxChildren,
-        cabin: quote.params.cabin,
-      })
-    : null;
+
+  // La última ronda de consulta: un snapshot por proveedor (el más reciente
+  // de cada uno). Como listSnapshots ya viene ordenado por fetchedAt desc,
+  // alcanza con quedarse con el primero que aparece de cada `provider`.
+  const latestRound = (() => {
+    const seen = new Set<string>();
+    const rows: typeof snapshots = [];
+    for (const s of snapshots) {
+      if (seen.has(s.provider)) continue;
+      seen.add(s.provider);
+      rows.push(s);
+    }
+    return rows;
+  })();
 
   return (
     <>
@@ -108,40 +104,35 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
             </dl>
           </div>
 
-          {latest && (
+          {latestRound.length > 0 && (
             <div className="card">
-              <h4 style={{ marginBottom: 14 }}>Última tarifa</h4>
-              <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                <span style={{ fontSize: 16, color: 'var(--muted)', marginRight: 8 }}>{latest.nativeCurrency}</span>
-                {latest.nativeCurrency === 'ARS' ? formatArs(latest.totalNative) : formatUsd(latest.totalUsd)}
-              </div>
-              {secondaryTotalLabel(latest) && (
-                <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 2 }}>{secondaryTotalLabel(latest)}</p>
-              )}
-              <p style={{ color: 'var(--muted)', fontSize: 13, fontFamily: 'var(--mono)', marginTop: 8 }}>
-                {primaryPerPaxLabel(latest)} por pasajero
-                {secondaryPerPaxLabel(latest) ? ` (${secondaryPerPaxLabel(latest)})` : ''} ·{' '}
-                {latest.carrier ?? 'sin aerolínea informada'}
+              <h4 style={{ marginBottom: 6 }}>Última comparación entre aerolíneas</h4>
+              <p style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 14 }}>
+                Consultada {formatStamp(latest!.fetchedAt)} · vence en {timeLeft(latest!.validUntil)}
               </p>
-              <p style={{ marginTop: 10, fontSize: 13.5 }}>
-                {fareDeltaLabel(latest) ?? 'primer chequeo de esta combinación'}
+              <FareCompareTable
+                rows={latestRound.map((s) => ({
+                  key: s.id,
+                  provider: s.provider,
+                  carrier: s.carrier,
+                  nativeCurrency: s.nativeCurrency,
+                  totalNative: s.totalNative,
+                  totalUsd: s.totalUsd,
+                  pricePerPaxNative: s.pricePerPaxNative,
+                  pricePerPaxUsd: s.pricePerPaxUsd,
+                  seatsLeft: s.seatsLeft,
+                  raw: s.raw,
+                }))}
+                origin={quote.params.origin}
+                destination={quote.params.destination}
+                departDate={quote.params.departDate ?? ''}
+                returnDate={quote.params.returnDate}
+                pax={totalPax(quote.params)}
+                showToolbar={latestRound.length > 1}
+              />
+              <p style={{ marginTop: 12, fontSize: 13.5 }}>
+                {fareDeltaLabel(latest!) ?? 'primer chequeo de esta combinación'}
               </p>
-              <p style={{ color: 'var(--muted)', fontSize: 12.5, marginTop: 10 }}>
-                Consultada {formatStamp(latest.fetchedAt)} · vence en {timeLeft(latest.validUntil)} ·
-                fuente {latest.provider}
-                {latest.seatsLeft !== null ? ` · ${latest.seatsLeft} lugares` : ''}
-              </p>
-              {reserveUrl && (
-                <a
-                  className="btn ghost block"
-                  style={{ marginTop: 14 }}
-                  href={reserveUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Reservar en {latest.carrier} →
-                </a>
-              )}
             </div>
           )}
 
@@ -174,6 +165,7 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
                   <thead>
                     <tr>
                       <th>Consultada</th>
+                      <th>Aerolínea</th>
                       <th>Pax</th>
                       <th>Total</th>
                       <th>Movimiento</th>
@@ -184,6 +176,7 @@ export default async function CotizacionPage({ params }: { params: Promise<{ id:
                     {snapshots.map((s) => (
                       <tr key={s.id}>
                         <td className="mono">{formatStamp(s.fetchedAt)}</td>
+                        <td>{s.carrier ?? s.provider}</td>
                         <td className="mono">{s.pax}</td>
                         <td className="mono">
                           {s.nativeCurrency === 'ARS' ? `ARS ${formatArs(s.totalNative)}` : `USD ${formatUsd(s.totalUsd)}`}

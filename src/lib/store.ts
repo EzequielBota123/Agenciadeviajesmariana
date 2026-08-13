@@ -79,6 +79,8 @@ export interface Store {
     departDate: string;
     returnDate?: string | null;
     pax: number;
+    /** Si se pasa, el "chequeo anterior" se busca solo entre snapshots del mismo proveedor. */
+    provider?: string;
   }): Promise<FareSnapshot | null>;
   listSnapshots(opts: { quoteId?: string; packageId?: string; limit?: number }): Promise<FareSnapshot[]>;
 }
@@ -419,11 +421,12 @@ class MemoryStore implements Store {
     departDate: string;
     returnDate?: string | null;
     pax: number;
+    provider?: string;
   }): Promise<FareSnapshot | null> {
     const wanted = fareKey(key);
     return (
       [...memoryState().snapshots]
-        .filter((s) => fareKey(s) === wanted)
+        .filter((s) => fareKey(s) === wanted && (key.provider === undefined || s.provider === key.provider))
         .sort((a, b) => b.fetchedAt.localeCompare(a.fetchedAt))[0] ?? null
     );
   }
@@ -713,17 +716,30 @@ class PostgresStore implements Store {
     departDate: string;
     returnDate?: string | null;
     pax: number;
+    provider?: string;
   }): Promise<FareSnapshot | null> {
-    const rows = await this.sql`
-      select * from fare_snapshots
-      where origin = ${key.origin}
-        and destination = ${key.destination}
-        and depart_date = ${key.departDate}
-        and return_date is not distinct from ${key.returnDate ?? null}
-        and pax = ${key.pax}
-      order by fetched_at desc
-      limit 1
-    `;
+    const rows = key.provider
+      ? await this.sql`
+          select * from fare_snapshots
+          where origin = ${key.origin}
+            and destination = ${key.destination}
+            and depart_date = ${key.departDate}
+            and return_date is not distinct from ${key.returnDate ?? null}
+            and pax = ${key.pax}
+            and provider = ${key.provider}
+          order by fetched_at desc
+          limit 1
+        `
+      : await this.sql`
+          select * from fare_snapshots
+          where origin = ${key.origin}
+            and destination = ${key.destination}
+            and depart_date = ${key.departDate}
+            and return_date is not distinct from ${key.returnDate ?? null}
+            and pax = ${key.pax}
+          order by fetched_at desc
+          limit 1
+        `;
     return rows[0] ? rowToSnapshot(rows[0]) : null;
   }
 

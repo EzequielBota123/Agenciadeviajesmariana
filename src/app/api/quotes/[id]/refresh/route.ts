@@ -24,18 +24,21 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!quote) return Response.json({ error: 'Consulta no encontrada.' }, { status: 404 });
 
   try {
-    const { snapshot, simulated, fallbackReason } = await checkFareForQuote(quote);
+    const { snapshots, errors, simulated, fallbackReason } = await checkFareForQuote(quote);
+    const cheapest = [...snapshots].sort((a, b) => a.totalUsd - b.totalUsd)[0];
     const pkg = quote.packageId ? await store().getPackage(quote.packageId) : null;
     const url = quoteUrl(quote.token);
 
     return Response.json({
-      snapshot,
-      deltaLabel: fareDeltaLabel(snapshot),
+      snapshot: cheapest,
+      snapshots,
+      errors,
+      deltaLabel: fareDeltaLabel(cheapest),
       simulated,
       fallbackReason,
       disclaimer: DISCLAIMER,
       url,
-      message: composeQuoteMessage({ quote, snapshot, pkg, publicUrl: url }),
+      message: composeQuoteMessage({ quote, snapshot: cheapest, pkg, publicUrl: url }),
     });
   } catch (err) {
     if (err instanceof QuotingError) {

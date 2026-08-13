@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { Countdown } from '@/components/Countdown';
+import { FareCompareTable } from '@/components/FareCompareTable';
 import { airportLabel } from '@/lib/agent/airports';
 import { DISCLAIMER, fareDeltaLabel } from '@/lib/agent/reply';
 import { bookingUrl } from '@/lib/booking';
@@ -28,10 +29,23 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
   if (!quote) notFound();
 
   const [snapshots, pkg] = await Promise.all([
-    store().listSnapshots({ quoteId: quote.id, limit: 1 }),
+    store().listSnapshots({ quoteId: quote.id, limit: 30 }),
     quote.packageId ? store().getPackage(quote.packageId) : Promise.resolve(null),
   ]);
-  const latest = snapshots[0] ?? null;
+
+  // Última ronda de consulta: un snapshot por proveedor (Aerolíneas,
+  // JetSMART, Kayak...), el más reciente de cada uno.
+  const latestRound = (() => {
+    const seen = new Set<string>();
+    const rows: typeof snapshots = [];
+    for (const s of snapshots) {
+      if (seen.has(s.provider)) continue;
+      seen.add(s.provider);
+      rows.push(s);
+    }
+    return rows;
+  })();
+  const latest = [...latestRound].sort((a, b) => a.totalUsd - b.totalUsd)[0] ?? null;
   const expired = latest ? isExpired(latest.validUntil) : false;
   const reserveUrl = latest
     ? bookingUrl({
@@ -168,6 +182,35 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
             )}
           </dl>
         </div>
+
+        {latestRound.length > 1 && (
+          <div className="card" style={{ marginBottom: 20 }}>
+            <h4 style={{ marginBottom: 6 }}>Comparamos entre varias aerolíneas</h4>
+            <p style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 14 }}>
+              Elegí la que más te convenga — el botón te lleva directo al buscador oficial de cada una.
+            </p>
+            <FareCompareTable
+              rows={latestRound.map((s) => ({
+                key: s.id,
+                provider: s.provider,
+                carrier: s.carrier,
+                nativeCurrency: s.nativeCurrency,
+                totalNative: s.totalNative,
+                totalUsd: s.totalUsd,
+                pricePerPaxNative: s.pricePerPaxNative,
+                pricePerPaxUsd: s.pricePerPaxUsd,
+                seatsLeft: s.seatsLeft,
+                raw: s.raw,
+              }))}
+              origin={quote.params.origin}
+              destination={quote.params.destination}
+              departDate={quote.params.departDate ?? ''}
+              returnDate={quote.params.returnDate}
+              pax={totalPax(quote.params)}
+              showToolbar={false}
+            />
+          </div>
+        )}
 
         {latest && (
           <div className="card" style={{ marginBottom: 40 }}>
