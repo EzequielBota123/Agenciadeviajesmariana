@@ -11,6 +11,7 @@ import {
   parseFlyerText,
   type FlyerData,
   type FlyerFormat,
+  type FlyerTemplate,
 } from '@/lib/flyer';
 import { placeFromTitle, searchPhotos, type PhotoSuggestion } from '@/lib/flyerPhotos';
 
@@ -30,6 +31,8 @@ export function FlyerStudio() {
   const [data, setData] = useState<FlyerData>(EMPTY_FLYER);
   const [theme, setTheme] = useState('azul');
   const [format, setFormat] = useState<FlyerFormat>('story');
+  const [template, setTemplate] = useState<FlyerTemplate>('foto');
+  const [logos, setLogos] = useState<HTMLImageElement[]>([]);
   const [photo, setPhoto] = useState<HTMLImageElement | null>(null);
   const [photoName, setPhotoName] = useState('');
   const [copied, setCopied] = useState(false);
@@ -41,6 +44,10 @@ export function FlyerStudio() {
   const [searchError, setSearchError] = useState('');
   const [pickedId, setPickedId] = useState('');
   const [loadingPick, setLoadingPick] = useState(false);
+  const [building, setBuilding] = useState(false);
+  const [engineNote, setEngineNote] = useState('');
+  const [extraQueries, setExtraQueries] = useState<string[]>([]);
+  const autoPick = useRef(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Agencia y contacto se recuerdan en este dispositivo.
@@ -66,8 +73,8 @@ export function FlyerStudio() {
   const redraw = useCallback(async () => {
     if (!canvasRef.current) return;
     await ensureFlyerFonts();
-    if (canvasRef.current) drawFlyer(canvasRef.current, data, theme, format, photo);
-  }, [data, theme, format, photo]);
+    if (canvasRef.current) drawFlyer(canvasRef.current, data, theme, format, photo, { template, logos });
+  }, [data, theme, format, photo, template, logos]);
 
   useEffect(() => {
     void redraw();
@@ -79,7 +86,9 @@ export function FlyerStudio() {
     setQuery(placeFromTitle(data.title));
   }, [data.title, queryEdited]);
 
-  const runSearch = useCallback(async (q: string) => {
+  const pickRef = useRef<(s: PhotoSuggestion) => void>(() => {});
+
+  const runSearch = useCallback(async (q: string, extra: string[] = []) => {
     if (!q.trim()) {
       setSuggestions([]);
       return;
@@ -87,7 +96,12 @@ export function FlyerStudio() {
     setSearching(true);
     setSearchError('');
     try {
-      setSuggestions(await searchPhotos(q));
+      const found = await searchPhotos(q, undefined, extra);
+      setSuggestions(found);
+      if (autoPick.current && found[0]) {
+        autoPick.current = false;
+        pickRef.current(found[0]);
+      }
     } catch (e) {
       setSuggestions([]);
       setSearchError(e instanceof Error ? e.message : 'No se pudo buscar fotos');
@@ -122,6 +136,8 @@ export function FlyerStudio() {
     img.src = s.full;
   };
 
+  pickRef.current = pick;
+
   const removePhoto = () => {
     setPhoto(null);
     setPhotoName('');
@@ -131,9 +147,47 @@ export function FlyerStudio() {
 
   const set = <K extends keyof FlyerData>(k: K, v: FlyerData[K]) => setData((d) => ({ ...d, [k]: v }));
 
-  const build = () => {
-    const parsed = parseFlyerText(raw);
-    setData((d) => ({ ...d, ...parsed }));
+  const build = async () => {
+    setBuilding(true);
+    setEngineNote('');
+    let fields: Partial<FlyerData> = {};
+    let queries: string[] = [];
+    let place = '';
+    try {
+      const res = await fetch('/api/flyers/assist', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text: raw }),
+      });
+      if (!res.ok) throw new Error('assist');
+      const out = (await res.json()) as {
+        fields: Partial<FlyerData>;
+        photoQueries: string[];
+        place: string;
+        engine: 'claude' | 'reglas';
+        note: string | null;
+      };
+      fields = out.fields;
+      queries = out.photoQueries;
+      place = out.place;
+      setEngineNote(
+        out.engine === 'claude'
+          ? 'Interpretado con Claude'
+          : out.note ?? 'Interpretado con reglas (sin Claude configurado)',
+      );
+    } catch {
+      fields = parseFlyerText(raw);
+      setEngineNote('Interpretado con reglas');
+    }
+    setData((d) => ({ ...d, ...fields, icons: fields.icons ?? [] }));
+    setBuilding(false);
+    // Foto: si todavía no hay una elegida, se busca y se usa la mejor sugerencia.
+    const q = place || placeFromTitle(fields.title ?? data.title);
+    setExtraQueries(queries);
+    setQueryEdited(true);
+    setQuery(q);
+    if (!photo) autoPick.current = true;
+    void runSearch(q, queries);
   };
 
   const onPhoto = (file: File | undefined) => {
@@ -149,6 +203,17 @@ export function FlyerStudio() {
     img.src = url;
   };
 
+  const onLogos = (files: FileList | null) => {
+    if (!files) return;
+    Array.from(files)
+      .slice(0, 4)
+      .forEach((file) => {
+        const img = new Image();
+        img.onload = () => setLogos((l) => [...l, img].slice(0, 4));
+        img.src = URL.createObjectURL(file);
+      });
+  };
+
   const download = async (formats: FlyerFormat[]) => {
     setBusy(true);
     await ensureFlyerFonts();
@@ -161,7 +226,7 @@ export function FlyerStudio() {
         .replace(/^-|-$/g, '') || 'flyer';
     for (const f of formats) {
       const c = document.createElement('canvas');
-      drawFlyer(c, data, theme, f, photo);
+      drawFlyer(c, data, theme, f, photo, { template, logos });
       const blob: Blob | null = await new Promise((res) => c.toBlob(res, 'image/png'));
       if (!blob) continue;
       const a = document.createElement('a');
@@ -205,17 +270,26 @@ export function FlyerStudio() {
             />
           </div>
           <div className="row">
-            <button className="btn" type="button" onClick={build} disabled={!raw.trim()}>
-              Armar flyer
+            <button className="btn" type="button" onClick={() => void build()} disabled={!raw.trim() || building}>
+              {building ? 'Armando…' : 'Armar flyer'}
             </button>
             <button className="btn ghost" type="button" onClick={() => setRaw(SAMPLE)}>
               Cargar ejemplo
             </button>
           </div>
+          {engineNote && <p className="hint" style={{ marginTop: 10, marginBottom: 0 }}>✓ {engineNote}</p>}
         </div>
 
         <div className="flyer-card">
           <h3>2. Formato y estilo</h3>
+          <div className="chips" style={{ marginBottom: 12 }}>
+            <button type="button" className={`chip ${template === 'foto' ? 'on' : ''}`} onClick={() => setTemplate('foto')}>
+              Foto completa
+            </button>
+            <button type="button" className={`chip ${template === 'collage' ? 'on' : ''}`} onClick={() => setTemplate('collage')}>
+              Collage con mapa
+            </button>
+          </div>
           <div className="chips">
             {(Object.keys(FLYER_FORMATS) as FlyerFormat[]).map((f) => (
               <button
@@ -256,10 +330,11 @@ export function FlyerStudio() {
               onChange={(e) => {
                 setQuery(e.target.value);
                 setQueryEdited(true);
+                setExtraQueries([]);
               }}
-              onKeyDown={(e) => e.key === 'Enter' && void runSearch(query)}
+              onKeyDown={(e) => e.key === 'Enter' && void runSearch(query, extraQueries)}
             />
-            <button className="btn ghost" type="button" onClick={() => void runSearch(query)} disabled={searching}>
+            <button className="btn ghost" type="button" onClick={() => void runSearch(query, queryEdited && extraQueries.length ? extraQueries : [])} disabled={searching}>
               {searching ? 'Buscando…' : 'Buscar'}
             </button>
           </div>
@@ -395,6 +470,30 @@ export function FlyerStudio() {
                 placeholder="WhatsApp 11 0000-0000"
                 onChange={(e) => set('contact', e.target.value)}
               />
+            </div>
+          </div>
+          <div className="field-row">
+            <div className="field">
+              <label htmlFor="f-badge">Insignia (opcional)</label>
+              <input
+                id="f-badge"
+                value={data.badge}
+                placeholder="15 años"
+                onChange={(e) => set('badge', e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="f-logos">Logos (aerolínea, operador)</label>
+              <input id="f-logos" type="file" accept="image/*" multiple onChange={(e) => onLogos(e.target.files)} />
+              {logos.length > 0 && (
+                <div className="hint">
+                  {logos.length} logo{logos.length > 1 ? 's' : ''}{' '}
+                  <button type="button" className="linklike" onClick={() => setLogos([])}>
+                    Quitar
+                  </button>{' '}
+                  (solo en “Collage con mapa”)
+                </div>
+              )}
             </div>
           </div>
           <div className="field">

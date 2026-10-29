@@ -165,14 +165,19 @@ async function searchOnce(query: string, bonus: number, signal?: AbortSignal): P
 /** Busca fotos para un destino. Mezcla variantes (alias conocidos + el nombre tal cual). */
 const cache = new Map<string, PhotoSuggestion[]>();
 
-export async function searchPhotos(place: string, signal?: AbortSignal): Promise<PhotoSuggestion[]> {
+export async function searchPhotos(
+  place: string,
+  signal?: AbortSignal,
+  extraQueries: string[] = [],
+): Promise<PhotoSuggestion[]> {
   const q = place.trim();
   if (!q) return [];
-  const hit = cache.get(plain(q));
+  const cacheKey = plain([q, ...extraQueries].join('|'));
+  const hit = cache.get(cacheKey);
   if (hit) return hit;
   const key = plain(q);
-  const queries: Array<{ q: string; bonus: number }> = [];
-  for (const [re, qs] of ALIASES) if (re.test(key)) queries.push(...qs.map((x) => ({ q: x, bonus: 4 })));
+  const queries: Array<{ q: string; bonus: number }> = extraQueries.map((x) => ({ q: x, bonus: 5 }));
+  if (!extraQueries.length) for (const [re, qs] of ALIASES) if (re.test(key)) queries.push(...qs.map((x) => ({ q: x, bonus: 4 })));
   queries.push({ q, bonus: 0 });
   if (queries.length === 1) queries.push({ q: `${q} landscape`, bonus: 1 });
 
@@ -197,6 +202,6 @@ export async function searchPhotos(place: string, signal?: AbortSignal): Promise
     throw new Error('El banco de fotos no respondió. Probá de nuevo en un minuto.');
   }
   const result = merged.slice(0, 12);
-  if (result.length) cache.set(plain(q), result);
+  if (result.length) cache.set(cacheKey, result);
   return result;
 }
