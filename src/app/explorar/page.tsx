@@ -1,3 +1,4 @@
+import { SiteFooter, SiteNav } from '@/components/SiteChrome';
 import { AIRPORTS } from '@/lib/agent/airports';
 import { EXPLORE_ORIGINS, exploreCycleDays, exploreRouteCount, isExploreOrigin, type ExploreOrigin } from '@/lib/explore';
 import { formatUsd, secondaryTotalLabel } from '@/lib/money';
@@ -6,7 +7,7 @@ import { store } from '@/lib/store';
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
-  title: 'Explorar destinos — Tarifa Viva',
+  title: 'Explorar destinos — Agencia de Viajes Mariana',
   description: 'Los 50 destinos que vendemos, ordenados por precio real. Sin buscar ruta por ruta.',
 };
 
@@ -39,21 +40,9 @@ export default async function ExplorarPage({
 
   return (
     <>
-      <nav>
-        <div className="wrap">
-          <a className="brand" href="/">
-            TARIFA<span>·</span>VIVA
-          </a>
-          <div className="navlinks">
-            <a href="/#demo">Buscar un vuelo</a>
-            <a href="/admin" className="cta">
-              Panel
-            </a>
-          </div>
-        </div>
-      </nav>
+      <SiteNav />
 
-      <header className="hero" style={{ paddingBottom: 30 }}>
+      <header className="home-hero" style={{ paddingBottom: 30 }}>
         <div className="wrap">
           <div className="eyebrow">Explorar destinos</div>
           <h1>¿A dónde te sale más barato viajar ahora mismo?</h1>
@@ -89,14 +78,14 @@ export default async function ExplorarPage({
             Todavía no hay precios calculados para {ORIGIN_LABEL[origin]}. El barrido nocturno cubre{' '}
             {exploreRouteCount()} rutas en tandas — puede tardar hasta {exploreCycleDays()} días en llegar a todos los
             destinos la primera vez. Mientras tanto, probá el{' '}
-            <a href="/#demo">comparador con una ruta puntual</a>.
+            <a href="/comparar">comparador con una ruta puntual</a>.
           </div>
         ) : (
           <div className="explore-grid">
             {ranked.map((s, i) => {
               const airport = airportByIata.get(s.destination);
               return (
-                <a key={s.id} className="explore-card" href={`/#demo`}>
+                <a key={s.id} className="explore-card" href={`/comparar`}>
                   {i === 0 && <span className="pill ok explore-card-badge">más barato hoy</span>}
                   <div className="explore-card-city">{airport?.city ?? s.destination}</div>
                   <div className="explore-card-country">{airport?.country ?? ''}</div>
@@ -116,19 +105,12 @@ export default async function ExplorarPage({
 
         <p style={{ color: 'var(--muted)', fontSize: 12.5, marginTop: 28 }}>
           Precios de referencia para 2 pasajeros, ida sola, tomados con ~60 días de anticipación. Pueden variar el
-          día que consultes de verdad — usá el <a href="/#demo">comparador</a> con tus fechas exactas antes de
+          día que consultes de verdad — usá el <a href="/comparar">comparador</a> con tus fechas exactas antes de
           confirmar nada.
         </p>
       </main>
 
-      <footer>
-        <div className="wrap">
-          <div className="brand">
-            TARIFA<span>·</span>VIVA
-          </div>
-          <div>Los precios son informativos y están sujetos a disponibilidad al momento de emitir.</div>
-        </div>
-      </footer>
+      <SiteFooter />
     </>
   );
 }

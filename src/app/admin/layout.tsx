@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'Panel — Tarifa Viva',
+  title: 'Panel — Agencia de Viajes Mariana',
 };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -8,12 +8,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <nav>
         <div className="wrap wrap-wide">
           <a className="brand" href="/admin">
-            TARIFA<span>·</span>VIVA <span style={{ color: 'var(--muted)' }}>/ panel</span>
+            Agencia de Viajes <span>Mariana</span> <span style={{ color: 'var(--muted)', fontWeight: 400 }}>/ panel</span>
           </a>
           <div className="navlinks">
             <a href="/admin">Consultas</a>
             <a href="/admin/paquetes/nuevo">Nuevo paquete</a>
-            <a href="/">Sitio público</a>
+            <a href="/flyers">Flyers</a>
+            <a href="/comparar">Comparar vuelos</a>
+            <a href="/">Inicio</a>
           </div>
         </div>
       </nav>

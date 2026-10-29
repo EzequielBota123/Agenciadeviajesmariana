@@ -167,7 +167,7 @@ nada que responder.
    | Variable | Obligatoria | Para qué |
    |---|---|---|
    | `DATABASE_URL` | sí en prod | Persistencia |
-   | `ADMIN_TOKEN` | sí en prod | Protege `/admin` y las rutas de escritura. Sin esto el panel queda **abierto**. |
+   | `REQUIRE_ADMIN_AUTH` / `ADMIN_TOKEN` | no | El panel es de acceso libre. Para volver a pedir contraseña: `REQUIRE_ADMIN_AUTH=1` + `ADMIN_TOKEN`. |
    | `CRON_SECRET` | recomendada | Vercel la manda como `Authorization: Bearer` al cron |
    | `ANTHROPIC_API_KEY` | opcional | Activa el agente de lenguaje natural |
    | `FARE_PROVIDER` + credenciales | opcional | Tarifas reales |

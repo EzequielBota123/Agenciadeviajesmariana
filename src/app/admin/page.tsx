@@ -3,7 +3,6 @@ import { DeleteQuoteButton } from '@/components/DeleteQuoteButton';
 import { RefreshPackageButton } from '@/components/RefreshPackageButton';
 import { agentEngine } from '@/lib/agent/parse';
 import { airportLabel } from '@/lib/agent/airports';
-import { adminTokenConfigured } from '@/lib/auth';
 import { daysUntil, formatDate, formatStamp } from '@/lib/dates';
 import { activeProviderName } from '@/lib/fares';
 import { primaryTotalLabel, secondaryTotalLabel } from '@/lib/money';
@@ -84,13 +83,6 @@ export default async function AdminPage() {
           Estás corriendo <strong>sin base de datos</strong>. Todo vive en memoria y se pierde
           cuando el proceso se reinicia — en Vercel eso pasa seguido. Configurá{' '}
           <code>DATABASE_URL</code> antes de cargar datos reales.
-        </div>
-      )}
-
-      {!adminTokenConfigured() && (
-        <div className="notice bad">
-          El panel está <strong>abierto</strong>: no hay <code>ADMIN_TOKEN</code> configurado.
-          Cualquiera con la URL puede crear paquetes y ver consultas. Configurálo antes de publicar.
         </div>
       )}
 
@@ -219,8 +211,7 @@ export default async function AdminPage() {
         <div className="table-wrap">
           {quotes.length === 0 ? (
             <div className="empty">
-              Todavía no entró ninguna consulta. Probá el formulario de la{' '}
-              <a href="/#demo">página pública</a>.
+              Todavía no entró ninguna consulta. Probá <a href="/consulta">leer un mensaje de cliente</a>.
             </div>
           ) : (
             <table>

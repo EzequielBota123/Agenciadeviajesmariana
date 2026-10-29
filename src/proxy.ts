@@ -6,9 +6,8 @@ const ADMIN_COOKIE = 'tv_admin';
 export default function proxy(req: NextRequest) {
   const token = process.env.ADMIN_TOKEN;
 
-  // Sin ADMIN_TOKEN el panel queda abierto: es el modo cómodo para desarrollo.
-  // En Vercel hay que configurarlo sí o sí antes de cargar datos reales.
-  if (!token) return NextResponse.next();
+  // El panel está abierto salvo que se active REQUIRE_ADMIN_AUTH=1 con un ADMIN_TOKEN.
+  if (process.env.REQUIRE_ADMIN_AUTH !== '1' || !token) return NextResponse.next();
 
   const { pathname } = req.nextUrl;
   if (pathname.startsWith('/admin/login')) return NextResponse.next();

@@ -18,7 +18,7 @@ import { BOARD_LABEL, totalPax } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
-  title: 'Tu cotización — Tarifa Viva',
+  title: 'Tu cotización — Agencia de Viajes Mariana',
   // El link se comparte por WhatsApp; no queremos que se indexe.
   robots: { index: false, follow: false },
 };
@@ -65,7 +65,7 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
       <nav>
         <div className="wrap">
           <a className="brand" href="/">
-            TARIFA<span>·</span>VIVA
+            Agencia de Viajes <span>Mariana</span>
           </a>
           <div className="navlinks">
             <span style={{ fontFamily: 'var(--mono)', fontSize: 12 }}>
@@ -234,7 +234,7 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
       <footer>
         <div className="wrap">
           <div className="brand">
-            TARIFA<span>·</span>VIVA
+            Agencia de Viajes <span>Mariana</span>
           </div>
           <div>Los precios son informativos y están sujetos a disponibilidad al momento de emitir.</div>
         </div>

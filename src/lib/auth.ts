@@ -2,9 +2,13 @@ import { cookies } from 'next/headers';
 
 export const ADMIN_COOKIE = 'tv_admin';
 
-/** Si no hay ADMIN_TOKEN configurado, el panel queda abierto (modo desarrollo). */
+/**
+ * El panel es de acceso libre salvo que se active explícitamente con
+ * REQUIRE_ADMIN_AUTH=1 (y haya un ADMIN_TOKEN). Así se vuelve a pedir
+ * contraseña sin tocar código.
+ */
 export function adminTokenConfigured(): boolean {
-  return Boolean(process.env.ADMIN_TOKEN);
+  return process.env.REQUIRE_ADMIN_AUTH === '1' && Boolean(process.env.ADMIN_TOKEN);
 }
 
 export function tokenMatches(candidate: string | undefined | null): boolean {
