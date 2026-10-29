@@ -12,6 +12,7 @@ import {
   type FlyerData,
   type FlyerFormat,
 } from '@/lib/flyer';
+import { placeFromTitle, searchPhotos, type PhotoSuggestion } from '@/lib/flyerPhotos';
 
 const SAMPLE = `EXPERIENCIA IGUAZÚ  $ 890.000   06 cuotas sin interés    - salidas de diciembre a Mayo, consultá fechas posibles
 El programa incluye:
@@ -33,6 +34,13 @@ export function FlyerStudio() {
   const [photoName, setPhotoName] = useState('');
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState('');
+  const [queryEdited, setQueryEdited] = useState(false);
+  const [suggestions, setSuggestions] = useState<PhotoSuggestion[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [pickedId, setPickedId] = useState('');
+  const [loadingPick, setLoadingPick] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Agencia y contacto se recuerdan en este dispositivo.
@@ -65,6 +73,62 @@ export function FlyerStudio() {
     void redraw();
   }, [redraw]);
 
+  // Sugerencia automática: cuando cambia el título se busca el destino (si no editaste la búsqueda a mano).
+  useEffect(() => {
+    if (queryEdited) return;
+    setQuery(placeFromTitle(data.title));
+  }, [data.title, queryEdited]);
+
+  const runSearch = useCallback(async (q: string) => {
+    if (!q.trim()) {
+      setSuggestions([]);
+      return;
+    }
+    setSearching(true);
+    setSearchError('');
+    try {
+      setSuggestions(await searchPhotos(q));
+    } catch (e) {
+      setSuggestions([]);
+      setSearchError(e instanceof Error ? e.message : 'No se pudo buscar fotos');
+    } finally {
+      setSearching(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (queryEdited) return;
+    const q = query;
+    const t = setTimeout(() => void runSearch(q), 1100);
+    return () => clearTimeout(t);
+  }, [query, queryEdited, runSearch]);
+
+  const pick = (s: PhotoSuggestion) => {
+    setLoadingPick(true);
+    setPickedId(s.id);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      setPhoto(img);
+      setPhotoName(s.title);
+      setData((d) => ({ ...d, photoCredit: s.credit }));
+      setLoadingPick(false);
+    };
+    img.onerror = () => {
+      setSearchError('No se pudo cargar esa foto, probá con otra.');
+      setPickedId('');
+      setLoadingPick(false);
+    };
+    img.src = s.full;
+  };
+
+  const removePhoto = () => {
+    setPhoto(null);
+    setPhotoName('');
+    setPickedId('');
+    setData((d) => ({ ...d, photoCredit: '' }));
+  };
+
   const set = <K extends keyof FlyerData>(k: K, v: FlyerData[K]) => setData((d) => ({ ...d, [k]: v }));
 
   const build = () => {
@@ -79,6 +143,8 @@ export function FlyerStudio() {
     img.onload = () => {
       setPhoto(img);
       setPhotoName(file.name);
+      setPickedId('');
+      setData((d) => ({ ...d, photoCredit: '' }));
     };
     img.src = url;
   };
@@ -179,11 +245,61 @@ export function FlyerStudio() {
 
         <div className="flyer-card">
           <h3>3. Foto de fondo</h3>
-          <div className="field">
-            <input type="file" accept="image/*" onChange={(e) => onPhoto(e.target.files?.[0])} />
-            <div className="hint">
-              {photoName ? `Usando: ${photoName}` : 'Sin foto se usa un fondo de color. Mejor una foto vertical y sin texto.'}
+          <p className="hint">
+            Te sugerimos fotos del destino según el título. Tocá una para usarla, o subí la tuya.
+          </p>
+          <div className="photo-search">
+            <input
+              value={query}
+              placeholder="Destino (ej: Cataratas del Iguazú)"
+              aria-label="Buscar fotos del destino"
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setQueryEdited(true);
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && void runSearch(query)}
+            />
+            <button className="btn ghost" type="button" onClick={() => void runSearch(query)} disabled={searching}>
+              {searching ? 'Buscando…' : 'Buscar'}
+            </button>
+          </div>
+          {searchError && <div className="notice bad" style={{ marginTop: 12, marginBottom: 0 }}>{searchError}</div>}
+          {searching && suggestions.length === 0 && <div className="photo-grid">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="photo-thumb skeleton" />)}</div>}
+          {suggestions.length > 0 && (
+            <div className="photo-grid">
+              {suggestions.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  className={`photo-thumb ${s.id === pickedId ? 'on' : ''}`}
+                  onClick={() => pick(s)}
+                  title={s.title}
+                  disabled={loadingPick}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={s.thumb} alt={s.title} loading="lazy" />
+                </button>
+              ))}
             </div>
+          )}
+          {!searching && !searchError && suggestions.length === 0 && query.trim() && (
+            <p className="hint" style={{ marginTop: 10 }}>
+              Sin resultados. Probá con el nombre del lugar más conocido (ej: “Cataratas”, “Capadocia”).
+            </p>
+          )}
+          {photo && (
+            <div className="hint" style={{ marginTop: 12 }}>
+              Usando: {photoName}{' '}
+              <button type="button" className="linklike" onClick={removePhoto}>
+                Quitar foto
+              </button>
+              {data.photoCredit && <div>El crédito del autor se imprime chico sobre la foto (lo piden las licencias).</div>}
+            </div>
+          )}
+          <div className="field" style={{ marginTop: 14 }}>
+            <label htmlFor="f-file">Subir mi propia foto</label>
+            <input id="f-file" type="file" accept="image/*" onChange={(e) => onPhoto(e.target.files?.[0])} />
+            <div className="hint">Sin foto se usa un fondo de color. Mejor una foto vertical y sin texto.</div>
           </div>
           <details className="gemini">
             <summary>¿No tenés foto? Generala con Gemini</summary>

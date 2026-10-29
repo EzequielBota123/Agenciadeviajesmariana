@@ -15,6 +15,7 @@ export interface FlyerData {
   footer: string;
   agency: string;
   contact: string;
+  photoCredit: string;
 }
 
 export type FlyerFormat = 'story' | 'post' | 'cuadrado';
@@ -129,6 +130,7 @@ export const EMPTY_FLYER: FlyerData = {
   footer: '',
   agency: 'Agencia de Viajes Mariana',
   contact: '',
+  photoCredit: '',
 };
 
 function sentence(s: string): string {
@@ -420,6 +422,18 @@ export function drawFlyer(
     ctx.beginPath();
     ctx.arc(W * 0.1, panelTop * 0.95, W * 0.26, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  if (photo && data.photoCredit.trim()) {
+    ctx.font = `500 18px ${HEAD}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.72)';
+    ctx.textAlign = 'right';
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 6;
+    ctx.fillText(data.photoCredit.trim(), W - M, panelTop - 18);
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+    ctx.textAlign = 'left';
   }
 
   // ── bloque superior ──

@@ -1,4 +1,5 @@
 import { SiteFooter, SiteNav } from '@/components/SiteChrome';
+import { Icon, type IconName } from '@/components/Icon';
 import { formatDate } from '@/lib/dates';
 import { primaryTotalLabel } from '@/lib/money';
 import { store } from '@/lib/store';
@@ -21,34 +22,34 @@ async function publishedPackages(): Promise<PackageCard[]> {
   );
 }
 
-const TOOLS = [
+const TOOLS: Array<{ href: string; icon: IconName; title: string; text: string }> = [
   {
     href: '/flyers',
-    icon: '🖼️',
+    icon: 'image',
     title: 'Crear un flyer',
     text: 'Pegá el texto del programa y obtené una pieza lista para historias y posteos de Instagram.',
   },
   {
     href: '/comparar',
-    icon: '✈️',
+    icon: 'plane',
     title: 'Comparar vuelos',
     text: 'Aerolíneas, JetSMART y Kayak en una sola búsqueda, con el precio del día.',
   },
   {
     href: '/explorar',
-    icon: '🧭',
+    icon: 'compass',
     title: 'Explorar destinos',
     text: 'Los destinos ordenados del más barato al más caro, saliendo desde tu ciudad.',
   },
   {
     href: '/consulta',
-    icon: '💬',
+    icon: 'chat',
     title: 'Leer una consulta',
     text: 'Copiá el mensaje de WhatsApp del cliente y se arma la consulta con fecha, destino y pasajeros.',
   },
   {
     href: '/admin',
-    icon: '📋',
+    icon: 'list',
     title: 'Panel de gestión',
     text: 'Consultas de clientes, paquetes publicados y seguimiento de tarifas.',
   },
@@ -88,7 +89,7 @@ export default async function HomePage() {
             {TOOLS.map((t) => (
               <a key={t.href} className="tool-card" href={t.href}>
                 <div className="tool-icon" aria-hidden>
-                  {t.icon}
+                  <Icon name={t.icon} />
                 </div>
                 <h3>{t.title}</h3>
                 <p>{t.text}</p>
