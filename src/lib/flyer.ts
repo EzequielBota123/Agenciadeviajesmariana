@@ -18,6 +18,13 @@ export interface FlyerData {
   photoCredit: string;
   /** Insignia opcional, ej: "15 años". */
   badge: string;
+  /** Título de la tarjeta de prestaciones ("El programa incluye:", "El vuelo incluye:"…). */
+  includesTitle: string;
+  /** Recuadro de texto libre: título (opcional) y texto. */
+  extraTitle: string;
+  extra: string;
+  /** Recuadros que se ocultan sin perder lo cargado. */
+  hidden: string[];
   /** Ícono por línea de "incluye" (si falta, se deduce del texto). */
   icons: string[];
 }
@@ -114,6 +121,57 @@ export const FLYER_THEMES: Record<string, FlyerTheme> = {
   },
 };
 
+export const FLYER_BLOCKS: Array<{ key: string; label: string }> = [
+  { key: 'label', label: 'Etiqueta' },
+  { key: 'tagline', label: 'Frase destacada' },
+  { key: 'dates', label: 'Fechas' },
+  { key: 'price', label: 'Precio' },
+  { key: 'priceNote', label: 'Debajo del precio' },
+  { key: 'includes', label: 'Lista de lo que incluye' },
+  { key: 'excludes', label: 'No incluye' },
+  { key: 'extra', label: 'Texto libre' },
+  { key: 'route', label: 'Recorrido' },
+  { key: 'contact', label: 'Contacto' },
+  { key: 'footer', label: 'Letra chica' },
+  { key: 'badge', label: 'Insignia' },
+];
+
+/** Tipos de flyer: ajustan la etiqueta, el título de la lista y qué recuadros se ven. */
+export const FLYER_KINDS: Record<string, { name: string; label: string; includesTitle: string; hidden: string[] }> = {
+  paquete: { name: 'Paquete', label: 'Paquete', includesTitle: 'El programa incluye:', hidden: [] },
+  vuelo: { name: 'Vuelo', label: 'Vuelo', includesTitle: 'El vuelo incluye:', hidden: ['route', 'badge'] },
+  tour: { name: 'Tour / excursión', label: 'Excursión', includesTitle: 'El tour incluye:', hidden: ['route', 'badge'] },
+  hotel: { name: 'Hotel', label: 'Alojamiento', includesTitle: 'El hotel incluye:', hidden: ['route', 'badge'] },
+  libre: {
+    name: 'Libre (solo texto)',
+    label: '',
+    includesTitle: 'Incluye:',
+    hidden: ['label', 'includes', 'excludes', 'route', 'badge', 'priceNote'],
+  },
+};
+
+/** Devuelve una copia con vacíos los recuadros ocultos. */
+function applyHidden(d: FlyerData): FlyerData {
+  const h = new Set(d.hidden ?? []);
+  if (!h.size) return d;
+  return {
+    ...d,
+    label: h.has('label') ? '' : d.label,
+    tagline: h.has('tagline') ? '' : d.tagline,
+    dates: h.has('dates') ? '' : d.dates,
+    price: h.has('price') ? '' : d.price,
+    priceNote: h.has('priceNote') || h.has('price') ? '' : d.priceNote,
+    includes: h.has('includes') ? [] : d.includes,
+    excludes: h.has('excludes') ? '' : d.excludes,
+    extra: h.has('extra') ? '' : d.extra,
+    extraTitle: h.has('extra') ? '' : d.extraTitle,
+    route: h.has('route') ? '' : d.route,
+    contact: h.has('contact') ? '' : d.contact,
+    footer: h.has('footer') ? '' : d.footer,
+    badge: h.has('badge') ? '' : d.badge,
+  };
+}
+
 export const EMPTY_FLYER: FlyerData = {
   label: 'Paquete',
   title: 'EXPERIENCIA IGUAZÚ',
@@ -136,6 +194,10 @@ export const EMPTY_FLYER: FlyerData = {
   contact: '',
   photoCredit: '',
   badge: '',
+  includesTitle: 'El programa incluye:',
+  extraTitle: '',
+  extra: '',
+  hidden: [],
   icons: [],
 };
 
@@ -368,13 +430,34 @@ export async function ensureFlyerFonts(): Promise<void> {
   }
 }
 
+interface ExtraLine {
+  t: string;
+  bold: boolean;
+}
+
+/** Título + párrafos del recuadro libre, ya cortados al ancho disponible. */
+function extraLines(ctx: CanvasRenderingContext2D, d: FlyerData, maxW: number, size: number): ExtraLine[] {
+  const out: ExtraLine[] = [];
+  if (d.extraTitle.trim()) {
+    ctx.font = `800 ${size}px ${HEAD}`;
+    wrap(ctx, d.extraTitle.trim(), maxW).forEach((t) => out.push({ t, bold: true }));
+  }
+  ctx.font = `600 ${size}px ${HEAD}`;
+  for (const para of d.extra.split('\n')) {
+    if (!para.trim()) continue;
+    wrap(ctx, para.trim(), maxW).forEach((t) => out.push({ t, bold: false }));
+  }
+  return out;
+}
+
 function drawFoto(
   canvas: HTMLCanvasElement,
-  data: FlyerData,
+  rawData: FlyerData,
   themeKey: string,
   format: FlyerFormat,
   photo: HTMLImageElement | null,
 ): void {
+  const data = applyHidden(rawData);
   const theme = FLYER_THEMES[themeKey] ?? FLYER_THEMES.azul;
   const { w: W, h: H } = FLYER_FORMATS[format];
   canvas.width = W;
@@ -496,13 +579,17 @@ function drawFoto(
         ? 24 * s * 2 + (exLines.length + routeLines.length) * exLH + (exLines.length && routeLines.length ? 8 * s : 0)
         : 0;
 
+    const xLines = extraLines(ctx, data, CARD_W - 2 * padX, 29 * s);
+    const xLH = 29 * s * 1.38;
+    const xH = xLines.length ? 24 * s * 2 + xLines.length * xLH : 0;
+
     ctx.font = `500 20px ${HEAD}`;
     const legalLines = data.footer.trim() ? wrap(ctx, data.footer.trim(), inner).slice(0, 3) : [];
     const footerH = 30 + 42 + (legalLines.length ? 8 + legalLines.length * 26 : 0) + 24 + bottomSafe;
 
     const gapA = cardH ? 16 : 0;
-    const total = tabH + cardH + (exH ? gapA + exH : 0) + footerH;
-    return { s, tile, textSize, lh, padX, colW, rows, place, tabH, cardH, exLines, routeLines, exLH, exH, legalLines, footerH, gapA, total };
+    const total = tabH + cardH + (exH ? gapA + exH : 0) + (xH ? 14 * s + xH : 0) + footerH;
+    return { s, tile, textSize, lh, padX, colW, rows, place, tabH, cardH, exLines, routeLines, exLH, exH, xLines, xLH, xH, legalLines, footerH, gapA, total };
   };
 
   const maxScale = isStory ? 1.25 : 1.05;
@@ -655,12 +742,13 @@ function drawFoto(
   if (items.length) {
     const tabFs = 31 * s;
     ctx.font = `800 ${tabFs}px ${HEAD}`;
-    const tabW = ctx.measureText('El programa incluye:').width + 60;
+    const tabText = data.includesTitle.trim() || 'El programa incluye:';
+    const tabW = ctx.measureText(tabText).width + 60;
     roundRect(ctx, CARD_X, y, tabW, bot.tabH + 20, [24 * s, 24 * s, 0, 0]);
     ctx.fillStyle = theme.accent;
     ctx.fill();
     ctx.fillStyle = theme.accentInk;
-    ctx.fillText('El programa incluye:', CARD_X + 30, y + bot.tabH / 2 + tabFs * 0.32);
+    ctx.fillText(tabText, CARD_X + 30, y + bot.tabH / 2 + tabFs * 0.32);
     y += bot.tabH;
 
     roundRect(ctx, CARD_X, y, CARD_W, bot.cardH, [0, 30 * s, 30 * s, 30 * s]);
@@ -725,6 +813,22 @@ function drawFoto(
     y += bot.exH;
   }
 
+  // ── recuadro de texto libre ──
+  if (bot.xH) {
+    y += 14 * s;
+    roundRect(ctx, CARD_X, y, CARD_W, bot.xH, 26 * s);
+    ctx.fillStyle = hexA(theme.panel, 0.92);
+    ctx.fill();
+    let xy = y + 24 * s;
+    bot.xLines.forEach((l) => {
+      xy += bot.xLH;
+      ctx.font = `${l.bold ? 800 : 600} ${29 * s}px ${HEAD}`;
+      ctx.fillStyle = l.bold ? theme.panelInk : theme.muted;
+      ctx.fillText(l.t, CARD_X + bot.padX, xy - 8 * s);
+    });
+    y += bot.xH;
+  }
+
   // ── pie ──
   const darkBg = theme.title === '#ffffff';
   let ty = H - bot.footerH + 30 + 32;
@@ -773,12 +877,13 @@ export function drawFlyer(
 
 function drawCollage(
   canvas: HTMLCanvasElement,
-  data: FlyerData,
+  rawData: FlyerData,
   themeKey: string,
   format: FlyerFormat,
   photo: HTMLImageElement | null,
   logos: HTMLImageElement[],
 ): void {
+  const data = applyHidden(rawData);
   const theme = FLYER_THEMES[themeKey] ?? FLYER_THEMES.azul;
   const { w: W, h: H } = FLYER_FORMATS[format];
   canvas.width = W;
@@ -865,9 +970,12 @@ function drawCollage(
     ctx.font = `600 19px ${HEAD}`;
     const legalLines = data.footer.trim() ? wrap(ctx, data.footer.trim(), W - 2 * M).slice(0, 3) : [];
     const barH = (legalLines.length ? 22 + legalLines.length * 25 + 18 : 0) + bottomSafe;
-    const left = 40 * s + listH + exH;
+    const xLines = extraLines(ctx, data, listW, 24 * s);
+    const xLH = 24 * s * 1.38;
+    const xH = xLines.length ? 12 * s + xLines.length * xLH : 0;
+    const left = 40 * s + listH + exH + xH;
     const needed = Math.max(left, rightNeeded) + 30 * s + barH;
-    return { s, tile, textSize, lh, textW, rows, exLines, routeLines, routeH, contactH, logoH, legalLines, barH, needed };
+    return { s, tile, textSize, lh, textW, rows, exLines, xLines, xLH, xH, routeLines, routeH, contactH, logoH, legalLines, barH, needed };
   };
 
   const maxScale = isStory ? 1.2 : 1.0;
@@ -1030,7 +1138,7 @@ function drawCollage(
       ctx.font = `700 ${top.noteSize}px ${HEAD}`;
       ctx.fillStyle = 'rgba(255,255,255,0.9)';
       py += top.noteSize * 1.1;
-      ctx.fillText(data.priceNote.trim().toUpperCase(), M, py);
+      ctx.fillText(data.priceNote.trim().toUpperCase(), M, py, bx0 - M - 30);
     }
   }
 
@@ -1085,8 +1193,18 @@ function drawCollage(
     });
   }
 
+  if (bot.xLines.length) {
+    ly += 12 * s;
+    bot.xLines.forEach((l) => {
+      ly += bot.xLH;
+      ctx.font = `${l.bold ? 800 : 600} ${24 * s}px ${HEAD}`;
+      ctx.fillStyle = l.bold ? '#1c2433' : '#4a5263';
+      ctx.fillText(l.t, M, ly - 6 * s);
+    });
+  }
+
   // ── columna derecha: recorrido, contacto, logos ──
-  let ry = by1 + 36 * s;
+  let ry = by1 + (bot.routeLines.length ? 36 : 66) * s;
   if (bot.routeLines.length) {
     const gw = rightW;
     const gy = ry + 34 * s;
@@ -1123,7 +1241,7 @@ function drawCollage(
   if (data.contact.trim()) {
     ry += 14 * s;
     ctx.font = `800 ${30 * s}px ${HEAD}`;
-    ctx.fillStyle = theme.accent === '#1b3a5c' ? theme.footer : theme.accent;
+    ctx.fillStyle = theme.footer;
     ctx.textAlign = 'right';
     ctx.fillText(data.contact.trim(), W - M, ry + 22 * s);
     ctx.textAlign = 'left';

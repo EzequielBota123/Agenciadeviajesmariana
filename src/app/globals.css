@@ -1575,3 +1575,23 @@ section.alt {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+/* ---------- RECUADROS A MOSTRAR ---------- */
+.block-toggles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px 14px;
+}
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.toggle input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--brand);
+}

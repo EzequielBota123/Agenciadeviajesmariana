@@ -17,12 +17,14 @@ const SYSTEM = `Sos el asistente de diseño de una agencia de viajes argentina. 
 Reglas:
 - Respetá TEXTUALMENTE precios, monedas, cuotas, fechas y cantidades. Nunca inventes ni cambies un número. Si algo no está en el texto, devolvé "" (o [] para listas).
 - title: nombre del producto en mayúsculas, corto (ej: "EXPERIENCIA IGUAZÚ").
-- label: etiqueta corta sobre el título ("Salida grupal", "Paquete", "Escapada"...). Si el texto dice salida grupal, usalo.
+- label: etiqueta corta sobre el título. El texto puede ser un paquete, un vuelo puntual, una excursión/tour o un hotel: usá "Paquete", "Salida grupal", "Vuelo", "Excursión", "Alojamiento" según corresponda. NO lo llames paquete si no lo es.
 - tagline: frase destacada solo si el texto la trae (ej: "¡En oferta!"); si no, "".
 - currency: "$" o "USD" tal cual figura. price: solo el número con su formato (ej: "890.000").
 - priceNote: cuotas / impuestos / condición junto al precio, corto (ej: "6 cuotas sin interés").
 - dates: fechas o rango de salidas, en una frase corta.
 - includes: una línea por prestación, redactada breve, sin viñetas. Podés quitar ceros a la izquierda ("03 noches" → "3 noches").
+- includesTitle: título de la lista según el tipo ("El programa incluye:" para paquetes, "El vuelo incluye:", "El tour incluye:", "El hotel incluye:"). Si no hay lista de prestaciones, "".
+- extraTitle y extra: todo texto del original que no encaje en los otros campos (condiciones, horarios, aclaraciones, info de contacto del servicio). extra puede tener varias líneas separadas por salto de línea. Nunca resumas ni cambies números. Si no sobra nada, "".
 - icons: un ícono por cada línea de includes, en el mismo orden, elegido solo de esta lista: ${FLYER_ICONS.join(', ')}.
 - excludes: lo que no incluye, en una línea.
 - route: recorrido o ciudades si el texto las menciona (separadas por " · "), si no "".
@@ -43,12 +45,15 @@ const SCHEMA = {
     icons: { type: 'array', items: { type: 'string', enum: FLYER_ICONS } },
     excludes: { type: 'string' },
     route: { type: 'string' },
+    includesTitle: { type: 'string' },
+    extraTitle: { type: 'string' },
+    extra: { type: 'string' },
     place: { type: 'string' },
     photoQueries: { type: 'array', items: { type: 'string' } },
   },
   required: [
     'title', 'label', 'tagline', 'dates', 'currency', 'price', 'priceNote',
-    'includes', 'icons', 'excludes', 'route', 'place', 'photoQueries',
+    'includes', 'icons', 'excludes', 'route', 'includesTitle', 'extraTitle', 'extra', 'place', 'photoQueries',
   ],
   additionalProperties: false,
 } as const;
@@ -65,6 +70,9 @@ interface Raw {
   icons: string[];
   excludes: string;
   route: string;
+  includesTitle: string;
+  extraTitle: string;
+  extra: string;
   place: string;
   photoQueries: string[];
 }
@@ -123,6 +131,9 @@ export async function assistFlyer(text: string): Promise<AssistResult> {
       icons,
       excludes: str(raw.excludes, 160),
       route: str(raw.route, 200),
+      includesTitle: str(raw.includesTitle, 40),
+      extraTitle: str(raw.extraTitle, 60),
+      extra: str(raw.extra, 800),
     };
     return {
       fields,

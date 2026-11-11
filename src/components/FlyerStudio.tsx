@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   EMPTY_FLYER,
+  FLYER_BLOCKS,
+  FLYER_KINDS,
   FLYER_FORMATS,
   FLYER_THEMES,
   backgroundPrompt,
@@ -44,6 +46,7 @@ export function FlyerStudio() {
   const [searchError, setSearchError] = useState('');
   const [pickedId, setPickedId] = useState('');
   const [loadingPick, setLoadingPick] = useState(false);
+  const [kind, setKind] = useState('paquete');
   const [building, setBuilding] = useState(false);
   const [engineNote, setEngineNote] = useState('');
   const [extraQueries, setExtraQueries] = useState<string[]>([]);
@@ -144,6 +147,24 @@ export function FlyerStudio() {
     setPickedId('');
     setData((d) => ({ ...d, photoCredit: '' }));
   };
+
+  const applyKind = (k: string) => {
+    const preset = FLYER_KINDS[k];
+    if (!preset) return;
+    setKind(k);
+    setData((d) => ({
+      ...d,
+      label: preset.label,
+      includesTitle: preset.includesTitle,
+      hidden: preset.hidden,
+    }));
+  };
+
+  const toggleBlock = (key: string) =>
+    setData((d) => ({
+      ...d,
+      hidden: d.hidden.includes(key) ? d.hidden.filter((h) => h !== key) : [...d.hidden, key],
+    }));
 
   const set = <K extends keyof FlyerData>(k: K, v: FlyerData[K]) => setData((d) => ({ ...d, [k]: v }));
 
@@ -281,7 +302,15 @@ export function FlyerStudio() {
         </div>
 
         <div className="flyer-card">
-          <h3>2. Formato y estilo</h3>
+          <h3>2. Tipo, formato y estilo</h3>
+          <p className="hint" style={{ marginBottom: 8 }}>Tipo de flyer</p>
+          <div className="chips" style={{ marginBottom: 14 }}>
+            {Object.entries(FLYER_KINDS).map(([k, v]) => (
+              <button key={k} type="button" className={`chip ${k === kind ? 'on' : ''}`} onClick={() => applyKind(k)}>
+                {v.name}
+              </button>
+            ))}
+          </div>
           <div className="chips" style={{ marginBottom: 12 }}>
             <button type="button" className={`chip ${template === 'foto' ? 'on' : ''}`} onClick={() => setTemplate('foto')}>
               Foto completa
@@ -313,6 +342,23 @@ export function FlyerStudio() {
                 <span className="swatch" style={{ background: `linear-gradient(135deg, ${t.bg1}, ${t.accent})` }} />
                 {t.name}
               </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flyer-card">
+          <h3>Qué recuadros mostrar</h3>
+          <p className="hint">Destildá lo que no quieras. Lo que cargaste no se pierde, solo se oculta.</p>
+          <div className="block-toggles">
+            {FLYER_BLOCKS.map((b) => (
+              <label key={b.key} className="toggle">
+                <input
+                  type="checkbox"
+                  checked={!data.hidden.includes(b.key)}
+                  onChange={() => toggleBlock(b.key)}
+                />
+                {b.label}
+              </label>
             ))}
           </div>
         </div>
@@ -436,6 +482,15 @@ export function FlyerStudio() {
             />
           </div>
           <div className="field">
+            <label htmlFor="f-inct">Título de la lista</label>
+            <input
+              id="f-inct"
+              value={data.includesTitle}
+              placeholder="El programa incluye:"
+              onChange={(e) => set('includesTitle', e.target.value)}
+            />
+          </div>
+          <div className="field">
             <label htmlFor="f-inc">Incluye (uno por línea)</label>
             <textarea
               id="f-inc"
@@ -447,6 +502,25 @@ export function FlyerStudio() {
           <div className="field">
             <label htmlFor="f-exc">No incluye</label>
             <input id="f-exc" value={data.excludes} onChange={(e) => set('excludes', e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="f-xt">Texto libre: título (opcional)</label>
+            <input
+              id="f-xt"
+              value={data.extraTitle}
+              placeholder="Información importante"
+              onChange={(e) => set('extraTitle', e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="f-x">Texto libre: contenido</label>
+            <textarea
+              id="f-x"
+              rows={4}
+              value={data.extra}
+              placeholder="Horarios, condiciones, aclaraciones… (una idea por línea)"
+              onChange={(e) => set('extra', e.target.value)}
+            />
           </div>
           <div className="field">
             <label htmlFor="f-route">Recorrido (opcional)</label>
