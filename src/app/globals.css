@@ -1595,3 +1595,7 @@ section.alt {
   height: 17px;
   accent-color: var(--brand);
 }
+
+.carousel-strip { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 10px; scroll-snap-type: x proximity; }
+.carousel-item { flex: 0 0 240px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; scroll-snap-align: start; }
+.carousel-item .flyer-canvas { width: 100%; height: auto; }

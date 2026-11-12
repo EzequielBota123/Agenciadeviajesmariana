@@ -307,6 +307,7 @@ export const FLYER_ICONS: FlyerIcon[] = [
 ];
 
 // Trazos en una grilla de 24×24 (estilo línea).
+export const FLYER_ICON_PATHS_REF = () => ICON_PATHS;
 const ICON_PATHS: Record<FlyerIcon, string> = {
   plane:
     'M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z',
@@ -372,11 +373,11 @@ function drawIcon(
 
 // ───────────────────────── dibujo ─────────────────────────
 
-const HEAD = "'Manrope', 'Helvetica Neue', Arial, sans-serif";
-const SERIF = "'Playfair Display', Georgia, serif";
-const COND = "'Bebas Neue', 'Oswald', 'Arial Narrow', Impact, sans-serif";
+export const HEAD = "'Manrope', 'Helvetica Neue', Arial, sans-serif";
+export const SERIF = "'Playfair Display', Georgia, serif";
+export const COND = "'Bebas Neue', 'Oswald', 'Arial Narrow', Impact, sans-serif";
 
-function wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
+export function wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let cur = '';
@@ -392,7 +393,7 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number): string
   return lines;
 }
 
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number | number[]) {
+export function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number | number[]) {
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, r);
 }
@@ -409,7 +410,7 @@ function coverImage(
   ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
 }
 
-function hexA(hex: string, a: number): string {
+export function hexA(hex: string, a: number): string {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
 }

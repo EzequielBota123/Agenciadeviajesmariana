@@ -15,6 +15,7 @@ export function SiteNav() {
           <a href="/explorar">Destinos</a>
           <a href="/comparar">Comparar vuelos</a>
           <a href="/flyers">Flyers</a>
+          <a href="/carrusel">Carruseles</a>
           <a href="/admin" className="cta">
             Panel
           </a>

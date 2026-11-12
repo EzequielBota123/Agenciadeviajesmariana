@@ -30,6 +30,12 @@ const TOOLS: Array<{ href: string; icon: IconName; title: string; text: string }
     text: 'Pegá el texto del programa y obtené una pieza lista para historias y posteos de Instagram.',
   },
   {
+    href: '/carrusel',
+    icon: 'list',
+    title: 'Crear un carrusel de tips',
+    text: 'Requisitos, consejos y guías de destino en varias láminas, con distintos diseños y colores.',
+  },
+  {
     href: '/comparar',
     icon: 'plane',
     title: 'Comparar vuelos',
